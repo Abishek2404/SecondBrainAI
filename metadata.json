@@ -1,0 +1,6 @@
+{
+  "name": "SecondBrain AI",
+  "description": "The AI Learning Operating System. A centralized workspace where students can upload study materials and transform them into an intelligent, searchable knowledge base.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
