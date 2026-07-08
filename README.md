@@ -9,113 +9,33 @@ SecondBrain AI is a centralized AI learning workspace where students can upload 
 ## 1. Complete Folder Structure
 
 ```
-/
-├── .env
-├── .gitignore
-├── components.json
-├── index.html
-├── metadata.json
-├── package.json
-├── package-lock.json
-├── README.md
-├── server.ts
-├── tsconfig.json
-├── vite.config.ts
-├── assets/
-│   └── .aistudio/
-│       └── .gitignore
-├── src/
-│   ├── App.tsx
-│   ├── index.css
-│   ├── main.tsx
-│   ├── components/
-│   │   ├── Analytics.tsx
-│   │   ├── AppLayout.tsx
-│   │   ├── AuthProvider.tsx
-│   │   ├── Chat.tsx
-│   │   ├── Dashboard.tsx
-│   │   ├── Documents.tsx
-│   │   ├── Flashcards.tsx
-│   │   ├── Login.tsx
-│   │   ├── NotificationsPopover.tsx
-│   │   ├── Profile.tsx
-│   │   ├── ProtectedRoute.tsx
-│   │   ├── Quizzes.tsx
-│   │   ├── Register.tsx
-│   │   ├── Settings.tsx
-│   │   ├── Sidebar.tsx
-│   │   ├── SmartNotes.tsx
-│   │   ├── StudyPlanner.tsx
-│   │   └── ui/
-│   │       ├── alert-dialog.tsx
-│   │       ├── avatar.tsx
-│   │       ├── badge.tsx
-│   │       ├── button.tsx
-│   │       ├── card.tsx
-│   │       ├── confirm-dialog.tsx
-│   │       ├── dialog.tsx
-│   │       ├── dropdown-menu.tsx
-│   │       ├── input.tsx
-│   │       ├── label.tsx
-│   │       ├── popover.tsx
-│   │       ├── scroll-area.tsx
-│   │       ├── select.tsx
-│   │       ├── separator.tsx
-│   │       ├── sheet.tsx
-│   │       ├── sonner.tsx
-│   │       ├── switch.tsx
-│   │       ├── tabs.tsx
-│   │       ├── textarea.tsx
-│   │       └── tooltip.tsx
-│   ├── lib/
-│   │   ├── api.ts
-│   │   └── utils.ts
-│   └── server/
-│       ├── db.ts
-│       ├── controllers/
-│       │   ├── auth.controller.ts
-│       │   ├── chat.controller.ts
-│       │   ├── dashboard.controller.ts
-│       │   ├── documents.controller.ts
-│       │   ├── flashcards.controller.ts
-│       │   ├── folders.controller.ts
-│       │   ├── notes.controller.ts
-│       │   ├── planner.controller.ts
-│       │   └── quiz.controller.ts
-│       ├── middlewares/
-│       │   ├── auth.ts
-│       │   ├── error.ts
-│       │   └── upload.ts
-│       ├── models/
-│       │   ├── Conversation.ts
-│       │   ├── Document.ts
-│       │   ├── DocumentChunk.ts
-│       │   ├── Exam.ts
-│       │   ├── Flashcard.ts
-│       │   ├── FlashcardDeck.ts
-│       │   ├── Folder.ts
-│       │   ├── Note.ts
-│       │   ├── Quiz.ts
-│       │   ├── QuizAttempt.ts
-│       │   ├── StudyPlan.ts
-│       │   └── User.ts
-│       ├── routes/
-│       │   ├── auth.routes.ts
-│       │   ├── chat.routes.ts
-│       │   ├── dashboard.routes.ts
-│       │   ├── documents.routes.ts
-│       │   ├── flashcards.routes.ts
-│       │   ├── folders.routes.ts
-│       │   ├── index.ts
-│       │   ├── notes.routes.ts
-│       │   ├── planner.routes.ts
-│       │   ├── quiz.routes.ts
-│       │   └── user.routes.ts
-│       └── services/
-│           ├── documentParser.ts
-│           └── rag.service.ts
-└── uploads/
-    └── avatar
+secondbrain-ai/
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ components/          # Reusable UI components (Shadcn, custom)
+â”‚   â”‚   â””â”€â”€ ui/              # Shadcn UI primitives
+â”‚   â”œâ”€â”€ features/            # Feature-based module organization
+â”‚   â”‚   â”œâ”€â”€ auth/            # Authentication context, login, signup
+â”‚   â”‚   â”œâ”€â”€ dashboard/       # Dashboard components and logic
+â”‚   â”‚   â”œâ”€â”€ documents/       # File upload, document management
+â”‚   â”‚   â”œâ”€â”€ chat/            # RAG chat interface
+â”‚   â”‚   â””â”€â”€ study/           # Flashcards, Quizzes, Planner
+â”‚   â”œâ”€â”€ hooks/               # Custom React hooks (e.g., useAuth, useUpload)
+â”‚   â”œâ”€â”€ lib/                 # Utilities (Tailwind merge, formatting)
+â”‚   â”œâ”€â”€ store/               # Zustand state stores
+â”‚   â”œâ”€â”€ types/               # TypeScript definitions
+â”‚   â””â”€â”€ App.tsx              # Root React component & Router
+â”œâ”€â”€ server/                  # Backend application (if separated)
+â”‚   â”œâ”€â”€ controllers/         # Request handlers
+â”‚   â”œâ”€â”€ middleware/          # Auth, Rate limiting, Validation
+â”‚   â”œâ”€â”€ models/              # Mongoose schemas
+â”‚   â”œâ”€â”€ routes/              # Express route definitions
+â”‚   â”œâ”€â”€ services/            # Business logic (AI, AWS, Pinecone)
+â”‚   â”œâ”€â”€ workers/             # BullMQ background job processors
+â”‚   â””â”€â”€ index.ts             # Express entry point
+â”œâ”€â”€ server.ts                # Full-stack monolithic entry point
+â”œâ”€â”€ .env.example             # Environment variables blueprint
+â”œâ”€â”€ package.json
+â””â”€â”€ vite.config.ts
 ```
 
 ---
