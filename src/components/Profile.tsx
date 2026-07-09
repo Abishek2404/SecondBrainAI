@@ -14,6 +14,8 @@ export function Profile() {
   const { user, updateUser } = useAuth();
   
   const [isEditing, setIsEditing] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  
   const [formData, setFormData] = useState({
     name: user?.name || '',
     bio: user?.bio || '',
@@ -23,6 +25,21 @@ export function Profile() {
     avatar: user?.avatar || ''
   });
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await apiFetch('/api/dashboard');
+        if (res.ok) {
+          const json = await res.json();
+          setStats(json.data);
+        }
+      } catch (error) {
+        console.error("Error fetching stats", error);
+      }
+    };
+    fetchAnalytics();
+  }, []);
   
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -119,22 +136,22 @@ export function Profile() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/50 p-3 rounded-lg text-center">
                   <FileText className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                  <div className="text-xl font-bold">12</div>
+                  <div className="text-xl font-bold">{stats ? stats.totalDocuments || 0 : '-'}</div>
                   <div className="text-xs text-muted-foreground">Documents</div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg text-center">
                   <BookOpen className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                  <div className="text-xl font-bold">45</div>
+                  <div className="text-xl font-bold">{stats ? stats.totalNotes || 0 : '-'}</div>
                   <div className="text-xs text-muted-foreground">Notes</div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg text-center">
                   <Zap className="h-5 w-5 mx-auto mb-1 text-yellow-500" />
-                  <div className="text-xl font-bold">128</div>
+                  <div className="text-xl font-bold">{stats ? (stats.reviewedFlashcards || stats.masteredFlashcards || 0) : '-'}</div>
                   <div className="text-xs text-muted-foreground">Flashcards</div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg text-center">
                   <Target className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                  <div className="text-xl font-bold">15</div>
+                  <div className="text-xl font-bold">{stats ? stats.totalQuizzesTaken || 0 : '-'}</div>
                   <div className="text-xs text-muted-foreground">Quizzes</div>
                 </div>
               </div>
@@ -145,14 +162,14 @@ export function Profile() {
                     <Zap className="h-4 w-4 text-orange-500" />
                     <span>Study Streak</span>
                   </div>
-                  <span className="font-bold">5 Days</span>
+                  <span className="font-bold">{stats ? `${stats.studyStreak || 0} Days` : '-'}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-blue-500" />
                     <span>Total Hours</span>
                   </div>
-                  <span className="font-bold">24h 30m</span>
+                  <span className="font-bold">{stats ? `${Math.floor(stats.totalStudyHours || 0)}h ${Math.round(((stats.totalStudyHours || 0) % 1) * 60)}m` : '-'}</span>
                 </div>
               </div>
             </CardContent>

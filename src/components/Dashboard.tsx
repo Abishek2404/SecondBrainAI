@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import { FileText, MessageSquare, BookOpen, Clock, TrendingUp, Sparkles, Plus, ArrowRight, BrainCircuit } from "lucide-react";
+import { FileText, MessageSquare, BookOpen, Clock, TrendingUp, Sparkles, Plus, ArrowRight, BrainCircuit, Zap } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
@@ -58,20 +58,35 @@ export function Dashboard() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
-          { label: "Study Tasks", value: analytics?.totalTasks || 0, icon: Clock },
-          { label: "Documents Analysed", value: analytics?.totalDocuments || 0, icon: FileText },
-          { label: "AI Flashcards Created", value: analytics?.totalFlashcards || 0, icon: Sparkles },
-          { label: "Average Quiz Score", value: `${analytics?.avgQuizScore || 0}%`, icon: TrendingUp },
+          { label: "Learning Streak", value: analytics ? `${analytics.studyStreak || 0} Days` : null, subtext: "Active streak", icon: Zap },
+          { label: "Study Tasks", value: analytics ? analytics.totalTasks : null, subtext: analytics ? `${analytics.completedTasks || 0} completed` : null, icon: Clock },
+          { label: "Documents Analysed", value: analytics ? analytics.totalDocuments : null, subtext: "Processed by AI", icon: FileText },
+          { label: "AI Flashcards", value: analytics ? analytics.totalFlashcards : null, subtext: analytics ? `${analytics.masteredFlashcards || 0} mastered` : null, icon: Sparkles },
+          { label: "Avg. Quiz Score", value: analytics ? `${analytics.avgQuizScore || 0}%` : null, subtext: analytics ? `${analytics.totalQuizzesTaken || 0} taken` : null, icon: TrendingUp },
         ].map((stat, i) => (
-          <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-muted-foreground mb-2">
+          <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col gap-2 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex items-center justify-between text-muted-foreground mb-2 relative z-10">
               <span className="text-sm font-medium">{stat.label}</span>
-              <stat.icon className="h-4 w-4" />
+              <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                <stat.icon className="h-4 w-4" />
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold tracking-tight">{stat.value}</span>
+            <div className="flex items-baseline gap-2 relative z-10">
+              {stat.value !== null ? (
+                <span className="text-3xl font-bold tracking-tight">{stat.value}</span>
+              ) : (
+                <div className="h-9 w-16 bg-muted rounded animate-pulse" />
+              )}
+            </div>
+            <div className="relative z-10 min-h-4 mt-1">
+              {stat.subtext !== null ? (
+                <span className="text-xs text-muted-foreground">{stat.subtext}</span>
+              ) : (
+                <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+              )}
             </div>
           </div>
         ))}

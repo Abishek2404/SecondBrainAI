@@ -4,6 +4,7 @@ import { Flashcard } from '../models/Flashcard';
 import { FlashcardDeck } from '../models/FlashcardDeck';
 import { QuizAttempt } from '../models/QuizAttempt';
 import { StudyPlan } from '../models/StudyPlan';
+import { Note } from '../models/Note';
 
 // @desc    Get dashboard analytics
 // @route   GET /api/analytics
@@ -13,6 +14,9 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
 
     // 1. Documents count
     const totalDocuments = await Document.countDocuments({ user: userId });
+    
+    // 1b. Notes count
+    const totalNotes = await Note.countDocuments({ user: userId });
 
     // 2. Flashcards Mastered vs Total
     const decks = await FlashcardDeck.find({ user: userId }).select('_id');
@@ -245,10 +249,63 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
       };
     });
 
+    // Calculate all-time stats for profile
+    const allAttempts = await QuizAttempt.find({ user: userId }).select('createdAt');
+    let totalStudyHours = allAttempts.length * 0.25; // 15 mins per quiz
+    
+    // add all completed tasks to total hours
+    plans.forEach(plan => {
+      plan.tasks.forEach(t => {
+        if (t.status === 'completed') {
+          const timeStr = t.duration || '';
+          if (timeStr.includes('m')) {
+            totalStudyHours += parseInt(timeStr) / 60;
+          } else if (timeStr.includes('h')) {
+            totalStudyHours += parseInt(timeStr);
+          } else {
+            totalStudyHours += 0.5; // default 30m
+          }
+        }
+      });
+    });
+
+    // simple streak calculation (last N days with at least some study activity)
+    let studyStreak = 0;
+    const allActiveDates = new Set<string>();
+    
+    allAttempts.forEach(a => {
+      // @ts-ignore
+      if (a.createdAt) allActiveDates.add(a.createdAt.toISOString().split('T')[0]);
+    });
+    
+    plans.forEach(plan => {
+      if (plan.tasks.some(t => t.status === 'completed')) {
+        allActiveDates.add(plan.date);
+      }
+    });
+
+    const activeDatesSorted = Array.from(allActiveDates).sort().reverse();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayStr = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0];
+    
+    let currentDateToCheck = todayStr;
+    if (activeDatesSorted.includes(todayStr) || activeDatesSorted.includes(yesterdayStr)) {
+      if (!activeDatesSorted.includes(todayStr)) {
+        currentDateToCheck = yesterdayStr;
+      }
+      
+      let dateToCheck = new Date(currentDateToCheck);
+      while (activeDatesSorted.includes(dateToCheck.toISOString().split('T')[0])) {
+        studyStreak++;
+        dateToCheck.setDate(dateToCheck.getDate() - 1);
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
         totalDocuments,
+        totalNotes,
         totalFlashcards,
         masteredFlashcards,
         reviewedFlashcards,
@@ -258,7 +315,9 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
         totalTasks,
         subjectPerformance,
         upcomingTasks,
-        studyDistribution
+        studyDistribution,
+        totalStudyHours: Math.round(totalStudyHours * 10) / 10,
+        studyStreak
       }
     });
   } catch (error) {

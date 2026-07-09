@@ -23,6 +23,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Profile } from "./components/Profile";
 import { Settings } from "./components/Settings";
 
+import { ThemeProvider } from "next-themes";
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -31,31 +33,33 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <TooltipProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-            
-            <Route path="/" element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="chat" element={<Chat />} />
-                <Route path="documents" element={<Documents />} />
-                <Route path="notes" element={<SmartNotes />} />
-                <Route path="quizzes" element={<Quizzes />} />
-                <Route path="planner" element={<StudyPlanner />} />
-                <Route path="flashcards" element={<Flashcards />} />
-                <Route path="analytics" element={<Analytics />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="settings" element={<Settings />} />
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+              
+              <Route path="/" element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="chat" element={<Chat />} />
+                  <Route path="documents" element={<Documents />} />
+                  <Route path="notes" element={<SmartNotes />} />
+                  <Route path="quizzes" element={<Quizzes />} />
+                  <Route path="planner" element={<StudyPlanner />} />
+                  <Route path="flashcards" element={<Flashcards />} />
+                  <Route path="analytics" element={<Analytics />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </BrowserRouter>
-        <Toaster />
-      </AuthProvider>
-    </TooltipProvider>
+            </Routes>
+          </BrowserRouter>
+          <Toaster />
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   );
 }

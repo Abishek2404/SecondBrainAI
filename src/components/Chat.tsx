@@ -1,20 +1,26 @@
 import { apiFetch } from '../lib/api';
-import { useState } from "react";
-import { Send, Bot, User, Paperclip, FileText, Image as ImageIcon } from "lucide-react";
+import { useState, useRef } from "react";
+import { Send, Bot, User, Paperclip, FileText, Image as ImageIcon, X, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  attachedFile?: string;
 }
 
 export function Chat() {
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [attachedDoc, setAttachedDoc] = useState<{ id: string; name: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -24,12 +30,50 @@ export function Chat() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await apiFetch("/api/documents", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAttachedDoc({ id: data.data._id, name: data.data.originalName || data.data.title });
+        toast.success("File attached successfully");
+      } else {
+        toast.error(data.error || "Failed to upload file");
+      }
+    } catch (error) {
+      toast.error("Error uploading file");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() && !attachedDoc) return;
+
+    const userContent = input.trim() || "Analyze this document.";
+    
+    const userMsg: Message = { 
+      id: Date.now().toString(), 
+      role: "user", 
+      content: userContent,
+      attachedFile: attachedDoc?.name
+    };
+    
     setMessages(prev => [...prev, userMsg]);
     setInput("");
+    const docIdToSend = attachedDoc?.id;
+    setAttachedDoc(null);
     setIsLoading(true);
 
     try {
@@ -37,8 +81,9 @@ export function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          text: userMsg.content, 
+          text: userContent, 
           conversationId,
+          documentId: docIdToSend
         })
       });
       const data = await response.json();
@@ -97,6 +142,12 @@ export function Chat() {
                   ? "bg-primary text-primary-foreground rounded-br-sm" 
                   : "bg-card border text-card-foreground rounded-bl-sm"
               }`}>
+                {msg.attachedFile && (
+                  <div className="flex items-center gap-2 mb-2 p-2 rounded bg-primary-foreground/10 border border-primary-foreground/20 text-xs">
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="truncate">{msg.attachedFile}</span>
+                  </div>
+                )}
                 <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
               </div>
               {msg.role === "user" && (
@@ -123,29 +174,68 @@ export function Chat() {
       
       <div className="p-4 bg-background border-t shrink-0">
         <div className="max-w-3xl mx-auto">
+          {attachedDoc && (
+            <div className="mb-3 flex items-center justify-between p-2.5 rounded-lg border bg-muted/50 text-sm">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate font-medium">{attachedDoc.name}</span>
+              </div>
+              <button 
+                onClick={() => setAttachedDoc(null)}
+                className="p-1 hover:bg-muted-foreground/20 rounded-full transition-colors shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            className="hidden" 
+            onChange={handleFileUpload} 
+          />
           <div className="relative flex items-center rounded-2xl border bg-card shadow-sm focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all overflow-hidden p-2">
             <div className="flex items-center gap-1 px-2 text-muted-foreground shrink-0">
-               <button className="p-1.5 hover:bg-muted rounded-full transition-colors"><Paperclip className="h-4 w-4" /></button>
+               <button 
+                 onClick={() => fileInputRef.current?.click()}
+                 disabled={isUploading}
+                 className="p-1.5 hover:bg-muted rounded-full transition-colors disabled:opacity-50"
+               >
+                 {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+               </button>
             </div>
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Ask anything about your notes, documents, or concepts..."
+              placeholder={isUploading ? "Uploading..." : "Ask anything about your notes, documents, or concepts..."}
+              disabled={isUploading}
               className="flex-1 border-0 shadow-none focus-visible:ring-0 h-10 px-2 bg-transparent"
             />
             <Button 
               size="icon" 
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={(!input.trim() && !attachedDoc) || isLoading || isUploading}
               className="rounded-full h-9 w-9 shrink-0"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
           <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
-             <button className="flex items-center gap-1.5 hover:text-foreground transition-colors"><FileText className="h-3.5 w-3.5" /> Attach Document</button>
-             <button className="flex items-center gap-1.5 hover:text-foreground transition-colors"><ImageIcon className="h-3.5 w-3.5" /> Analyze Image</button>
+             <button 
+               onClick={() => fileInputRef.current?.click()}
+               disabled={isUploading}
+               className="flex items-center gap-1.5 hover:text-foreground transition-colors disabled:opacity-50"
+             >
+               <FileText className="h-3.5 w-3.5" /> Attach Document
+             </button>
+             <button 
+               onClick={() => fileInputRef.current?.click()}
+               disabled={isUploading}
+               className="flex items-center gap-1.5 hover:text-foreground transition-colors disabled:opacity-50"
+             >
+               <ImageIcon className="h-3.5 w-3.5" /> Analyze Image
+             </button>
           </div>
         </div>
       </div>

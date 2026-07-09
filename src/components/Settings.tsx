@@ -111,7 +111,7 @@ export function Settings() {
                   <Label className="text-base">Theme</Label>
                   <p className="text-sm text-muted-foreground">Select your preferred color theme.</p>
                 </div>
-                <Select value={theme} onValueChange={setTheme}>
+                <Select value={theme || 'system'} onValueChange={setTheme}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Select theme" />
                   </SelectTrigger>
