@@ -19,11 +19,14 @@ import { AuthProvider, useAuth } from "./components/AuthProvider";
 import { Quizzes } from "./components/Quizzes";
 import { Login } from "./components/Login";
 import { Register } from "./components/Register";
+import { ForgotPassword } from "./components/ForgotPassword";
+import { ResetPassword } from "./components/ResetPassword";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Profile } from "./components/Profile";
 import { Settings } from "./components/Settings";
 
 import { ThemeProvider } from "next-themes";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -32,14 +35,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
+  
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <Routes>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <Routes>
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+              <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+              <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
               
               <Route path="/" element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
@@ -61,5 +69,6 @@ export default function App() {
         </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>
+    </GoogleOAuthProvider>
   );
 }

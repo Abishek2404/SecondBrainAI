@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bell, Clock } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger, PopoverHeader, PopoverTitle } from "./ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { apiFetch } from "@/lib/api";
+import { useNotifications } from "@/lib/useNotifications";
 
 export function NotificationsPopover() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { enabled, sendNotification } = useNotifications();
+  const notifiedTasksRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -13,7 +16,35 @@ export function NotificationsPopover() {
         const res = await apiFetch('/api/dashboard');
         if (res.ok) {
           const data = await res.json();
-          setTasks(data.data.upcomingTasks || []);
+          const upcoming = data.data.upcomingTasks || [];
+          setTasks(upcoming);
+          
+          if (enabled) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            
+            // Check for tasks due today that we haven't notified about yet
+            upcoming.forEach((task: any) => {
+              const taskKey = `${task.title}-${task.date}`;
+              if (task.date === todayStr && !notifiedTasksRef.current.has(taskKey)) {
+                sendNotification("Study Reminder", {
+                  body: `You have an upcoming session: ${task.title}`,
+                  icon: '/icon.png'
+                });
+                notifiedTasksRef.current.add(taskKey);
+              }
+            });
+            
+            // Check if they are close to reaching goals (e.g., almost all tasks completed)
+            const completed = data.data.completedTasks || 0;
+            const total = data.data.totalTasks || 0;
+            if (total > 0 && completed > 0 && completed === total - 1 && !notifiedTasksRef.current.has('almost-done')) {
+              sendNotification("Almost there!", {
+                body: `You only have 1 task left to reach your daily goal! Keep going!`,
+                icon: '/icon.png'
+              });
+              notifiedTasksRef.current.add('almost-done');
+            }
+          }
         }
       } catch (error) {
         console.error("Failed to fetch notifications:", error);
@@ -21,12 +52,13 @@ export function NotificationsPopover() {
         setLoading(false);
       }
     };
+
     fetchTasks();
     
     // Refresh every minute
     const interval = setInterval(fetchTasks, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled, sendNotification]);
 
   const unreadCount = tasks.length;
 

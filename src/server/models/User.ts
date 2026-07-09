@@ -5,6 +5,9 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string;
+  provider?: string;
+  googleId?: string;
+  passwordUpdatedAt?: Date;
   role: 'user' | 'admin';
   avatar?: string;
   bio?: string;
@@ -12,6 +15,8 @@ export interface IUser extends Document {
   preferredLanguage?: string;
   timeZone?: string;
   subscriptionPlan?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpire?: Date;
   createdAt?: Date;
   updatedAt?: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -34,10 +39,18 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     password: {
       type: String,
-      required: [true, 'Please add a password'],
       minlength: 6,
       select: false,
     },
+    provider: {
+      type: String,
+      default: 'local'
+    },
+    googleId: {
+      type: String,
+      sparse: true
+    },
+    passwordUpdatedAt: Date,
     role: {
       type: String,
       enum: ['user', 'admin'],
@@ -65,6 +78,8 @@ const UserSchema: Schema<IUser> = new Schema(
       enum: ['free', 'premium', 'pro'],
       default: 'free',
     },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   {
     timestamps: true,

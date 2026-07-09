@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthProvider';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -12,9 +12,17 @@ import { Switch } from './ui/switch';
 import { useTheme } from 'next-themes';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
+import { useNotifications } from '../lib/useNotifications';
+
 export function Settings() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { enabled, toggleNotifications } = useNotifications();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -70,7 +78,9 @@ export function Settings() {
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+          {(user?.hasPassword || user?.provider !== 'google') && (
+            <TabsTrigger value="security">Security</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="account" className="space-y-6">
@@ -111,7 +121,7 @@ export function Settings() {
                   <Label className="text-base">Theme</Label>
                   <p className="text-sm text-muted-foreground">Select your preferred color theme.</p>
                 </div>
-                <Select value={theme || 'system'} onValueChange={setTheme}>
+                <Select value={mounted ? theme : 'system'} onValueChange={setTheme}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Select theme" />
                   </SelectTrigger>
@@ -136,7 +146,7 @@ export function Settings() {
                   <span>Study Reminders</span>
                   <span className="font-normal text-sm text-muted-foreground">Get reminded about your daily study goals.</span>
                 </Label>
-                <Switch id="study-reminders" defaultChecked />
+                <Switch id="study-reminders" checked={enabled} onCheckedChange={toggleNotifications} />
               </div>
               <div className="flex items-center justify-between space-x-2">
                 <Label htmlFor="product-updates" className="flex flex-col space-y-1">
@@ -150,51 +160,53 @@ export function Settings() {
         </TabsContent>
 
         <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>Ensure your account is using a long, random password to stay secure.</CardDescription>
-            </CardHeader>
-            <form onSubmit={handlePasswordChange}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input 
-                    id="current-password" 
-                    type="password" 
-                    value={passwordData.currentPassword}
-                    onChange={e => setPasswordData({...passwordData, currentPassword: e.target.value})}
-                    required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input 
-                    id="new-password" 
-                    type="password" 
-                    value={passwordData.newPassword}
-                    onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})}
-                    required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                  <Input 
-                    id="confirm-password" 
-                    type="password" 
-                    value={passwordData.confirmPassword}
-                    onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-                    required 
-                  />
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Updating...' : 'Update Password'}
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+          {(user?.hasPassword || user?.provider !== 'google') && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Change Password</CardTitle>
+                <CardDescription>Ensure your account is using a long, random password to stay secure.</CardDescription>
+              </CardHeader>
+              <form onSubmit={handlePasswordChange}>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input 
+                      id="current-password" 
+                      type="password" 
+                      value={passwordData.currentPassword}
+                      onChange={e => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input 
+                      id="new-password" 
+                      type="password" 
+                      value={passwordData.newPassword}
+                      onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})}
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input 
+                      id="confirm-password" 
+                      type="password" 
+                      value={passwordData.confirmPassword}
+                      onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                      required 
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Updating...' : 'Update Password'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

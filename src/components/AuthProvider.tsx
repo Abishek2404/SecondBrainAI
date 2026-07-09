@@ -7,6 +7,9 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  provider?: string;
+  googleId?: string;
+  hasPassword?: boolean;
   avatar?: string;
   bio?: string;
   learningGoal?: string;
