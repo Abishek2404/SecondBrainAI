@@ -8,6 +8,7 @@ import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { Check, X } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+import { Logo } from './Logo';
 
 function GoogleIcon() {
   return (
@@ -103,7 +104,13 @@ export function Register() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-muted/30 py-8">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4 sm:p-8">
+      
+      <div className="mb-8 flex flex-col items-center justify-center space-y-4">
+        <Logo className="h-20 w-auto" />
+        <span className="text-2xl font-bold tracking-tight">SecondBrain AI</span>
+      </div>
+
       <div className="w-full max-w-md rounded-xl border bg-card p-8 shadow-sm">
         <div className="mb-6 flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>

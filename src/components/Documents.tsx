@@ -25,6 +25,7 @@ export function Documents() {
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [moveDocState, setMoveDocState] = useState<{ id: string, open: boolean }>({ id: "", open: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFolders = async () => {
@@ -179,6 +180,51 @@ export function Documents() {
     }
   };
 
+  const handleMoveDocument = async (id: string, targetFolderId: string | 'root') => {
+    try {
+      const res = await apiFetch(`/api/documents/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId: targetFolderId }),
+      });
+      
+      if (res.ok) {
+        toast.success("Document moved");
+        fetchDocuments();
+        fetchFolders();
+      } else {
+        toast.error("Failed to move document");
+      }
+    } catch (error) {
+      toast.error("Failed to move document");
+    }
+  };
+
+  const handleRenameFolder = async (id: string, currentName: string) => {
+    const newName = prompt("Enter new name:", currentName);
+    if (!newName) return;
+
+    try {
+      const res = await apiFetch(`/api/folders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      });
+      
+      if (res.ok) {
+        toast.success("Folder renamed");
+        fetchFolders();
+        if (currentFolder?._id === id) {
+          setCurrentFolder({ ...currentFolder, name: newName });
+        }
+      } else {
+        toast.error("Failed to rename folder");
+      }
+    } catch (error) {
+      toast.error("Failed to rename folder");
+    }
+  };
+
   const handleDeleteFolder = async (id: string) => {
     
     try {
@@ -292,9 +338,22 @@ export function Documents() {
                       <span className="text-xs text-muted-foreground">{f.files} files</span>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setItemToDelete({ id: f._id, type: 'folder' }); }}>
-                    <Trash className="h-3 w-3 text-red-500" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem className="gap-2" onClick={() => { handleRenameFolder(f._id, f.name); }}>
+                        <Edit2 className="h-4 w-4" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500" onClick={() => { setItemToDelete({ id: f._id, type: 'folder' }); }}>
+                        <Trash className="h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ))}
             </div>
@@ -352,11 +411,14 @@ export function Documents() {
                               <Download className="h-4 w-4" /> Download
                             </a>
                           } />
-                          <DropdownMenuItem className="gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRenameDocument(doc._id, doc.title); }}>
+                          <DropdownMenuItem className="gap-2" onClick={() => { handleRenameDocument(doc._id, doc.title); }}>
                             <Edit2 className="h-4 w-4" /> Rename
                           </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={() => { setMoveDocState({ id: doc._id, open: true }); }}>
+                            <Folder className="h-4 w-4" /> Move
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setItemToDelete({ id: doc._id, type: 'document' }); }}>
+                          <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500" onClick={() => { setItemToDelete({ id: doc._id, type: 'document' }); }}>
                             <Trash className="h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -457,6 +519,45 @@ export function Documents() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateFolder}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={moveDocState.open} onOpenChange={(open) => setMoveDocState({ ...moveDocState, open })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Move Document</DialogTitle>
+            <DialogDescription>
+              Select a destination folder for this document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
+            <div 
+              className="flex items-center gap-3 p-3 rounded-md hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
+              onClick={() => {
+                handleMoveDocument(moveDocState.id, 'root');
+                setMoveDocState({ id: "", open: false });
+              }}
+            >
+              <Folder className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Root Directory</span>
+            </div>
+            {folders.map(f => (
+              <div 
+                key={f._id} 
+                className="flex items-center gap-3 p-3 rounded-md hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
+                onClick={() => {
+                  handleMoveDocument(moveDocState.id, f._id);
+                  setMoveDocState({ id: "", open: false });
+                }}
+              >
+                <Folder className="h-5 w-5 text-blue-500 fill-blue-500/20" />
+                <span className="font-medium">{f.name}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveDocState({ ...moveDocState, open: false })}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

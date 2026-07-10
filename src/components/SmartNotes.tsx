@@ -304,7 +304,7 @@ export function SmartNotes() {
                         </Button>
                       } />
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setItemToDelete(note._id); }}>
+                        <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={() => { setItemToDelete(note._id); }}>
                           <Trash className="h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

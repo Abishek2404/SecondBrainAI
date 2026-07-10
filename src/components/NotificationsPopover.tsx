@@ -47,7 +47,7 @@ export function NotificationsPopover() {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch notifications:", error);
+        // Silently ignore transient fetch errors during polling
       } finally {
         setLoading(false);
       }

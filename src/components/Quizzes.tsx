@@ -369,7 +369,7 @@ export function Quizzes() {
                       </Button>
                     } />
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setItemToDelete(quiz._id); }}>
+                      <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={() => { setItemToDelete(quiz._id); }}>
                         <Trash className="h-4 w-4" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>

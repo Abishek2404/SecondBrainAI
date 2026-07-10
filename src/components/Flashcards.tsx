@@ -343,7 +343,7 @@ export function Flashcards() {
                         </Button>
                       } />
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setItemToDelete(deck._id); }}>
+                        <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2" onClick={() => { setItemToDelete(deck._id); }}>
                           <Trash className="h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

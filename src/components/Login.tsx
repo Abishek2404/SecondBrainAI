@@ -7,6 +7,9 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { useGoogleLogin } from '@react-oauth/google';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Logo } from './Logo';
+import { motion } from 'motion/react';
 
 function GoogleIcon() {
   return (
@@ -25,10 +28,13 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setLoading(true);
+      setErrorMsg(null);
       try {
         const res = await apiFetch('/api/auth/google', {
           method: 'POST',
@@ -36,21 +42,25 @@ export function Login() {
           body: JSON.stringify({ token: tokenResponse.access_token }),
         });
         const data = await res.json();
+        
         if (res.ok) {
           localStorage.setItem('token', data.token);
           login(data.user);
           toast.success('Logged in with Google');
           navigate('/');
         } else {
+          setErrorMsg(data.error || 'Google login failed');
           toast.error(data.error || 'Google login failed');
         }
       } catch (error) {
+        setErrorMsg('An error occurred during Google login');
         toast.error('An error occurred during Google login');
       } finally {
         setLoading(false);
       }
     },
     onError: () => {
+      setErrorMsg('Google login failed');
       toast.error('Google login failed');
     }
   });
@@ -58,6 +68,7 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null);
     try {
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
@@ -65,15 +76,18 @@ export function Login() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
+      
       if (res.ok) {
         localStorage.setItem('token', data.token);
         login(data.user);
         toast.success('Logged in successfully');
         navigate('/');
       } else {
+        setErrorMsg(data.error || 'Login failed');
         toast.error(data.error || 'Login failed');
       }
     } catch (error) {
+      setErrorMsg('An error occurred during login. Please check your connection.');
       toast.error('An error occurred during login');
     } finally {
       setLoading(false);
@@ -81,49 +95,135 @@ export function Login() {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-muted/30">
-      <div className="w-full max-w-md rounded-xl border bg-card p-8 shadow-sm">
-        <div className="mb-6 flex flex-col space-y-2 text-center">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4 sm:p-8">
+      
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="mb-8 flex flex-col items-center justify-center space-y-4"
+      >
+        <Logo className="h-20 w-auto" />
+        <span className="text-2xl font-bold tracking-tight">SecondBrain AI</span>
+      </motion.div>
+      
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+        className="w-full max-w-md rounded-2xl border bg-card p-6 sm:p-8 shadow-sm sm:shadow-md"
+      >
+        <div className="mb-8 flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
           <p className="text-sm text-muted-foreground">Enter your email to sign in to your account</p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {errorMsg && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <p>{errorMsg}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="m@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
+                <Mail className="h-4 w-4" />
+              </div>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="m@example.com" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                required 
+                disabled={loading}
+                autoComplete="email"
+                className="pl-9 h-10 transition-shadow focus-visible:ring-primary/20"
+                aria-invalid={!!errorMsg}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+              <Link 
+                to="/forgot-password" 
+                className="text-sm font-medium text-primary hover:text-primary/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm px-1 -mx-1 transition-colors"
+              >
                 Forgot Password?
               </Link>
             </div>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
+                <Lock className="h-4 w-4" />
+              </div>
+              <Input 
+                id="password" 
+                type={showPassword ? "text" : "password"} 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+                disabled={loading}
+                autoComplete="current-password"
+                className="pl-9 pr-10 h-10 transition-shadow focus-visible:ring-primary/20"
+                aria-invalid={!!errorMsg}
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:text-foreground transition-colors disabled:opacity-50"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+          <Button type="submit" className="w-full h-10 font-medium" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
         
-        <div className="relative my-4">
+        <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
+            <span className="w-full border-t border-border" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+          <div className="relative flex justify-center text-[11px] uppercase font-medium tracking-wider">
+            <span className="bg-card px-3 text-muted-foreground/70">Or continue with</span>
           </div>
         </div>
         
-        <Button type="button" variant="outline" className="w-full" onClick={() => googleLogin()} disabled={loading}>
-          <GoogleIcon /> Google
+        <Button 
+          type="button" 
+          variant="outline" 
+          className="w-full h-10 bg-background hover:bg-muted/50 transition-colors font-medium" 
+          onClick={() => googleLogin()} 
+          disabled={loading}
+        >
+          <GoogleIcon /> 
+          Continue with Google
         </Button>
 
-        <div className="mt-4 text-center text-sm">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="underline">Sign up</Link>
+        <div className="mt-8 text-center text-sm text-muted-foreground">
+          Don't have an account?{' '}
+          <Link 
+            to="/register" 
+            className="font-medium text-primary hover:text-primary/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm px-1 -mx-1 transition-colors"
+          >
+            Sign up
+          </Link>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
