@@ -1,0 +1,624 @@
+import { apiFetch } from '../lib/api';
+import { 
+  FileText, MessageSquare, BookOpen, Clock, TrendingUp, Sparkles, Plus, 
+  ArrowRight, BrainCircuit, Zap, Flame, Trophy, Target, ChevronDown, 
+  MoreHorizontal, ChevronLeft, ChevronRight, Activity, CalendarDays, UploadCloud, ExternalLink
+} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
+import { motion, AnimatePresence } from "motion/react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { DashboardCardSkeleton, DetailedCardSkeleton } from "./Skeletons";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "./ui/tooltip";
+
+export function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [currentRecIndex, setCurrentRecIndex] = useState(0);
+
+  const recommendations = React.useMemo(() => {
+    if (!analytics) return [
+      {
+        title: "Review CSS Box Model",
+        description: "You're slightly behind on this topic. Spend 30 minutes today to strengthen your understanding.",
+        time: "30 min",
+        impact: "High Impact",
+        icon: <BrainCircuit className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+        link: "/documents"
+      }
+    ];
+    const recs = [];
+    
+    if (analytics.subjectPerformance && analytics.subjectPerformance.length > 0) {
+       const lowestSubject = [...analytics.subjectPerformance].sort((a, b) => a.score - b.score)[0];
+       if (lowestSubject.score < 80) {
+         recs.push({
+           title: `Review ${lowestSubject.subject}`,
+           description: `Your mastery in ${lowestSubject.subject} is currently at ${lowestSubject.score}%. Spend some time reviewing it to boost your score.`,
+           time: '30 min',
+           impact: 'High Impact',
+           icon: <Target className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+           link: '/quizzes'
+         });
+       }
+    }
+
+    if (analytics.upcomingTasks && analytics.upcomingTasks.length > 0) {
+       const nextTask = analytics.upcomingTasks[0];
+       recs.push({
+          title: `Upcoming: ${nextTask.title}`,
+          description: `You have an upcoming task scheduled for today. Completing this will help maintain your study streak.`,
+          time: nextTask.duration || '15 min',
+          impact: 'Medium Impact',
+          icon: <CalendarDays className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+          link: '/planner'
+       });
+    }
+
+    if (recs.length < 3) {
+       const defaults = [
+         {
+            title: 'Start a new Quiz',
+            description: "Test your knowledge by taking a new quiz.",
+            time: '15 min',
+            impact: 'Low Impact',
+            icon: <BrainCircuit className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+            link: '/quizzes'
+         },
+         {
+            title: 'Review Recent Documents',
+            description: "Read through your recent uploads to solidify your understanding of the material.",
+            time: '20 min',
+            impact: 'Medium Impact',
+            icon: <FileText className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+            link: '/documents'
+         },
+         {
+            title: 'Plan Your Week',
+            description: "Set up a study plan to keep your streak going.",
+            time: '10 min',
+            impact: 'High Impact',
+            icon: <CalendarDays className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />,
+            link: '/planner'
+         }
+       ];
+       
+       for (const def of defaults) {
+         if (recs.length >= 3) break;
+         if (!recs.some(r => r.title === def.title)) {
+           recs.push(def);
+         }
+       }
+    }
+
+    return recs;
+  }, [analytics]);
+
+  const safeIndex = currentRecIndex >= recommendations.length ? 0 : currentRecIndex;
+  const nextRec = () => {
+    setCurrentRecIndex((prev) => (prev + 1) % recommendations.length);
+  };
+
+  const prevRec = () => {
+    setCurrentRecIndex((prev) => (prev - 1 + recommendations.length) % recommendations.length);
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [analyticsRes, documentsRes] = await Promise.all([
+          apiFetch('/api/dashboard'),
+          apiFetch('/api/documents')
+        ]);
+        
+        if (analyticsRes.ok) {
+          const json = await analyticsRes.json();
+          setAnalytics(json.data);
+        }
+        
+        if (documentsRes.ok) {
+          const json = await documentsRes.json();
+          setDocuments(json.data.slice(0, 5));
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const currentStreakVal = user?.currentStreak !== undefined ? user.currentStreak : (analytics?.studyStreak || 0);
+  const longestStreakVal = user?.longestStreak !== undefined ? user.longestStreak : (analytics?.studyStreak || 0);
+  const xp = user?.xp || 0;
+  const level = user?.level || 1;
+  const nextLevelXp = level * 100;
+  const xpProgress = Math.min(100, Math.round(((xp % 100) / 100) * 100));
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-8 min-h-screen">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="space-y-2 w-1/2">
+             <div className="h-8 w-3/4 bg-muted animate-pulse rounded-md"></div>
+             <div className="h-4 w-1/2 bg-muted animate-pulse rounded-md"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <DashboardCardSkeleton />
+          <DashboardCardSkeleton />
+          <DashboardCardSkeleton />
+          <DashboardCardSkeleton />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+           <div className="lg:col-span-2"><DetailedCardSkeleton /></div>
+           <div className="lg:col-span-3"><DetailedCardSkeleton /></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-8 min-h-screen">
+      
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-2">
+            Welcome back, {user?.name?.split(' ')[0] || 'Learner'}! <span className="animate-wave inline-block origin-[70%_70%]">👋</span>
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Keep learning, keep growing. Your Second Brain is getting stronger every day.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-5 py-2">
+            <Zap className="h-4 w-4" />
+            Quick Actions
+            <ChevronDown className="h-4 w-4 text-muted-foreground ml-1" />
+          </button>
+        </div>
+      </div>
+
+      {/* Hero Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Learning Streak Card */}
+        <motion.div whileHover={{ y: -2 }} className="rounded-2xl border bg-[#1A1A1A] text-white p-6 relative overflow-hidden flex flex-col justify-between shadow-sm">
+          <div className="absolute -right-4 -bottom-4 opacity-80 pointer-events-none">
+             <div className="w-24 h-24 bg-orange-500 rounded-full blur-[40px]" />
+          </div>
+          <div className="flex items-center gap-2 mb-6 relative z-10">
+            <Flame className="h-5 w-5 text-orange-500" />
+            <span className="font-semibold text-sm">Learning Streak</span>
+          </div>
+          <div className="relative z-10 flex flex-col">
+             <div className="flex items-baseline gap-1">
+               <span className="text-5xl font-bold tracking-tighter">{currentStreakVal}</span>
+               <span className="text-gray-400 font-medium text-sm">days</span>
+             </div>
+             <div className="text-gray-400 text-xs mt-2">
+               Best: {longestStreakVal} days
+             </div>
+          </div>
+          <Flame className="absolute bottom-4 right-4 h-16 w-16 text-orange-500/80 drop-shadow-[0_0_15px_rgba(249,115,22,0.5)]" strokeWidth={1} />
+        </motion.div>
+
+        {/* Level & XP Card */}
+        <motion.div whileHover={{ y: -2 }} className="rounded-2xl border bg-card p-6 flex flex-col justify-between shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-400 fill-amber-400" />
+              <span className="font-semibold text-sm">Level & XP</span>
+            </div>
+            <button className="text-muted-foreground hover:bg-muted p-1 rounded-full transition-colors">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-3">
+             <div className="text-3xl font-bold tracking-tight">Lv. {level}</div>
+             <div className="text-xs font-medium text-muted-foreground">
+               {xp} / {nextLevelXp} XP
+             </div>
+             <div className="h-2 w-full bg-muted overflow-hidden rounded-full mt-1">
+               <div className="h-full bg-foreground rounded-full transition-all duration-1000 ease-out" style={{ width: `${xpProgress}%` }} />
+             </div>
+          </div>
+        </motion.div>
+
+        {/* Coins Card */}
+        <motion.div whileHover={{ y: -2 }} className="rounded-2xl border bg-card p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="h-5 w-5 rounded-full bg-yellow-400 flex items-center justify-center text-[10px] font-bold text-yellow-900 border border-yellow-500">$</div>
+            <span className="font-semibold text-sm">Coins</span>
+          </div>
+          <div className="flex flex-col">
+             <div className="text-4xl font-bold tracking-tight mb-2">{(user?.coins || 0).toLocaleString()}</div>
+             <div className="text-xs font-medium text-emerald-500">
+               +30 today
+             </div>
+          </div>
+          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-yellow-400/20 rounded-full blur-[20px] pointer-events-none" />
+          <div className="absolute right-6 bottom-6 h-12 w-12 rounded-full bg-yellow-400 flex items-center justify-center text-xl font-bold text-yellow-900 shadow-[0_0_15px_rgba(250,204,21,0.4)] border-2 border-yellow-300">
+            $
+          </div>
+        </motion.div>
+
+        {/* Focus Points Card */}
+        <motion.div whileHover={{ y: -2 }} className="rounded-2xl border bg-card p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-6">
+            <Target className="h-5 w-5 text-red-500" />
+            <span className="font-semibold text-sm">Focus Points</span>
+          </div>
+          <div className="flex flex-col">
+             <div className="text-4xl font-bold tracking-tight mb-2">{(user?.focusPoints || 0).toLocaleString()}</div>
+             <div className="text-xs font-medium text-emerald-500">
+               +15 today
+             </div>
+          </div>
+          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-red-500/10 rounded-full blur-[20px] pointer-events-none" />
+          <div className="absolute right-6 bottom-6 flex items-center justify-center">
+             <Target className="h-14 w-14 text-slate-800 drop-shadow-md" strokeWidth={1.5} />
+             <div className="absolute inset-0 bg-red-500/20 rounded-full blur-[10px]" />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Middle Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        
+        {/* Weekly Study Goal */}
+        <div className="lg:col-span-2 rounded-2xl border bg-card p-6 shadow-sm flex flex-col sm:flex-row items-center gap-6">
+           <div className="flex flex-col justify-between w-full">
+             <div className="flex items-center justify-between mb-4 sm:mb-8">
+               <h3 className="font-semibold text-sm">Weekly Study Goal</h3>
+               <Target className="h-4 w-4 text-emerald-500" />
+             </div>
+             
+             <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
+                {/* Progress Ring (Recharts) */}
+                <div className="relative h-32 w-32 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Completed', value: 24.6, fill: '#10b981' },
+                          { name: 'Remaining', value: Math.max(0, 30 - 24.6), fill: 'hsl(var(--muted))' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={55}
+                        startAngle={90}
+                        endAngle={-270}
+                        dataKey="value"
+                        stroke="none"
+                        cornerRadius={10}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                    <span className="text-2xl font-bold tracking-tighter">82%</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 w-full text-center sm:text-left">
+                  <h4 className="font-bold text-lg">Great progress!</h4>
+                  <p className="text-sm text-muted-foreground mb-2">24.6 of 30 hours completed</p>
+                  <Link to="/planner" className="inline-flex items-center justify-center sm:justify-start gap-2 whitespace-nowrap rounded-lg text-sm font-medium bg-foreground text-background hover:bg-foreground/90 h-10 px-4 w-full sm:w-auto transition-all hover:gap-3">
+                    Continue Learning <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+             </div>
+           </div>
+        </div>
+
+        {/* AI Study Recommendation */}
+        <div className="lg:col-span-3 rounded-2xl border bg-card p-6 shadow-sm flex flex-col relative overflow-hidden group">
+          <div className="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-indigo-500/5 to-transparent pointer-events-none" />
+          
+          <div className="flex items-center gap-2 mb-6">
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+            <h3 className="font-semibold text-sm">AI Study Recommendation</h3>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-4 mb-4">Based on your recent activity</p>
+
+          <div className="flex items-center gap-4">
+             <button className="h-8 w-8 rounded-full border bg-background hover:bg-muted flex items-center justify-center shrink-0 shadow-sm z-10 transition-colors">
+               <ChevronLeft className="h-4 w-4" />
+             </button>
+             
+             <div className="flex-1 bg-muted/40 rounded-xl p-5 border border-border/50 flex items-center gap-6 relative overflow-hidden">
+                <div className="flex flex-col gap-2 flex-1 z-10">
+                  <h4 className="font-bold text-base">Review CSS Box Model</h4>
+                  <p className="text-sm text-muted-foreground mb-2 max-w-[80%]">
+                    You're slightly behind on this topic. Spend 30 minutes today to strengthen your understanding.
+                  </p>
+                  <div className="flex items-center gap-3 text-xs font-medium">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" /> 30 min
+                    </div>
+                    <div className="flex items-center gap-1 text-indigo-600 bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                      <Zap className="h-3 w-3" /> High Impact
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="hidden sm:flex h-20 w-20 rounded-2xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20 shrink-0 z-10">
+                   <BrainCircuit className="h-10 w-10 text-indigo-500" strokeWidth={1.5} />
+                </div>
+             </div>
+
+             <button className="h-8 w-8 rounded-full border bg-background hover:bg-muted flex items-center justify-center shrink-0 shadow-sm z-10 transition-colors">
+               <ChevronRight className="h-4 w-4" />
+             </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-1.5 mt-4">
+            <div className="w-1.5 h-1.5 rounded-full bg-foreground" />
+            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+        
+        {/* Left Column */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-lg tracking-tight">Recent Documents</h3>
+            <Link to="/documents" className="text-sm text-muted-foreground hover:text-foreground font-medium inline-flex items-center gap-1 transition-colors">
+              View all <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          
+          <div className="flex flex-col gap-3">
+            {documents.map((doc, i) => (
+              <motion.div whileHover={{ x: 2 }} key={i} className="group flex items-center justify-between p-3 rounded-2xl border bg-card hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer">
+                 <div className="flex items-center gap-4 overflow-hidden">
+                   <div className="h-10 w-10 shrink-0 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 font-bold text-[10px] tracking-wider shadow-sm">
+                     {doc.type === 'pdf' || doc.mimeType?.includes('pdf') ? 'PDF' : doc.type === 'txt' || doc.mimeType?.includes('text') ? 'TXT' : 'DOC'}
+                   </div>
+                   <div className="flex flex-col min-w-0">
+                     <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                       {doc.title}
+                     </h4>
+                     <span className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                     </span>
+                   </div>
+                 </div>
+                 <a 
+                   href={doc.url} 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   onClick={(e) => e.stopPropagation()}
+                   className="opacity-0 group-hover:opacity-100 p-2 rounded-full hover:bg-muted transition-all shrink-0 ml-2"
+                 >
+                   <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                 </a>
+              </motion.div>
+            ))}
+
+            {/* Upload Card */}
+            <motion.div 
+              whileHover={{ y: -2 }} 
+              onClick={() => navigate('/documents')}
+              className="flex items-center justify-center p-4 rounded-2xl border border-dashed bg-muted/30 hover:bg-muted/50 transition-all cursor-pointer gap-3 group mt-2"
+            >
+              <div className="h-8 w-8 rounded-xl bg-background border flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                 <UploadCloud className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="font-medium text-sm">Upload Document</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* This Week's Progress */}
+          <div className="mt-4 flex flex-col gap-4">
+             <h3 className="font-semibold text-lg tracking-tight">This Week's Progress</h3>
+             <div className="rounded-2xl border bg-card p-6 shadow-sm grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Stats Grid */}
+                <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4 divide-x divide-border">
+                  <div className="flex flex-col gap-1 px-2 first:pl-0">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1">
+                      <Clock className="h-3 w-3 text-blue-500" /> Study Time
+                    </div>
+                    <span className="text-xl font-bold tracking-tight">24h 36m</span>
+                    <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-0.5">
+                      <ArrowRight className="h-3 w-3 -rotate-45" /> 4h 12m
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1 px-4">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1">
+                      <Activity className="h-3 w-3 text-emerald-500" /> Tasks
+                    </div>
+                    <span className="text-xl font-bold tracking-tight">84</span>
+                    <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-0.5">
+                      <ArrowRight className="h-3 w-3 -rotate-45" /> 17
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 px-4">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1">
+                      <TrendingUp className="h-3 w-3 text-purple-500" /> Accuracy
+                    </div>
+                    <span className="text-xl font-bold tracking-tight">87%</span>
+                    <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-0.5">
+                      <ArrowRight className="h-3 w-3 -rotate-45" /> 9%
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 px-4">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1">
+                      <FileText className="h-3 w-3 text-amber-500" /> Docs
+                    </div>
+                    <span className="text-xl font-bold tracking-tight">3</span>
+                    <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-0.5">
+                      <ArrowRight className="h-3 w-3 -rotate-45" /> 2
+                    </span>
+                  </div>
+                </div>
+
+                {/* Heatmap Dummy */}
+                <TooltipProvider>
+                  <div className="flex flex-col justify-end">
+                     <div className="flex text-[10px] text-muted-foreground justify-between mb-2 px-1">
+                       <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                     </div>
+                     <div className="grid grid-cols-7 gap-1">
+                       {[
+                         { day: 'Mon', hours: 1, opacity: 'bg-emerald-500/20' },
+                         { day: 'Tue', hours: 2, opacity: 'bg-emerald-500/40' },
+                         { day: 'Wed', hours: 0, opacity: 'bg-emerald-500/10' },
+                         { day: 'Thu', hours: 3, opacity: 'bg-emerald-500/60' },
+                         { day: 'Fri', hours: 1, opacity: 'bg-emerald-500/20' },
+                         { day: 'Sat', hours: 5, opacity: 'bg-emerald-500' },
+                         { day: 'Sun', hours: 0, opacity: 'bg-emerald-500/10' },
+                         { day: 'Mon', hours: 3, opacity: 'bg-emerald-500/60' },
+                         { day: 'Tue', hours: 1, opacity: 'bg-emerald-500/20' },
+                         { day: 'Wed', hours: 4, opacity: 'bg-emerald-500/80' },
+                         { day: 'Thu', hours: 2, opacity: 'bg-emerald-500/40' },
+                         { day: 'Fri', hours: 0, opacity: 'bg-emerald-500/10' },
+                         { day: 'Sat', hours: 5, opacity: 'bg-emerald-500' },
+                         { day: 'Sun', hours: 1, opacity: 'bg-emerald-500/20' },
+                       ].map((cell, i) => (
+                         <Tooltip key={i}>
+                           <TooltipTrigger render={<div className={`aspect-square ${cell.opacity} rounded-sm transition-transform hover:scale-110 cursor-pointer`} />} />
+                           <TooltipContent>
+                             <p>{cell.hours} {cell.hours === 1 ? 'hour' : 'hours'} studied on {cell.day}</p>
+                           </TooltipContent>
+                         </Tooltip>
+                       ))}
+                     </div>
+                     <div className="flex items-center justify-between mt-2 text-[9px] text-muted-foreground">
+                       <span>Less</span>
+                       <div className="flex gap-0.5">
+                         <div className="w-2 h-2 bg-emerald-500/10 rounded-[1px]" />
+                         <div className="w-2 h-2 bg-emerald-500/40 rounded-[1px]" />
+                         <div className="w-2 h-2 bg-emerald-500/60 rounded-[1px]" />
+                         <div className="w-2 h-2 bg-emerald-500/80 rounded-[1px]" />
+                         <div className="w-2 h-2 bg-emerald-500 rounded-[1px]" />
+                       </div>
+                       <span>More</span>
+                     </div>
+                  </div>
+                </TooltipProvider>
+
+             </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-lg tracking-tight">Upcoming Tasks</h3>
+            <Link to="/planner" className="text-sm text-muted-foreground hover:text-foreground font-medium inline-flex items-center gap-1 transition-colors">
+              View all <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          
+          <div className="rounded-2xl border bg-card p-2 shadow-sm flex flex-col gap-1">
+            {[
+              { title: "Complete HTML Practice", time: "Today, 6:00 PM", tag: "Practice", color: "text-purple-500", bg: "bg-purple-500/10", tagCol: "text-purple-600 bg-purple-500/10", icon: CalendarDays },
+              { title: "Review CSS Flexbox", time: "Today, 7:00 PM", tag: "Reading", color: "text-blue-500", bg: "bg-blue-500/10", tagCol: "text-blue-600 bg-blue-500/10", icon: BookOpen },
+              { title: "JavaScript Quiz", time: "Tomorrow, 10:00 AM", tag: "Quiz", color: "text-emerald-500", bg: "bg-emerald-500/10", tagCol: "text-emerald-600 bg-emerald-500/10", icon: BrainCircuit },
+              { title: "Flashcards Review", time: "Tomorrow, 4:00 PM", tag: "Review", color: "text-amber-500", bg: "bg-amber-500/10", tagCol: "text-amber-600 bg-amber-500/10", icon: Sparkles }
+            ].map((task, i) => (
+              <div key={i} className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-xl transition-colors cursor-pointer group">
+                <div className="flex items-center gap-4">
+                  <div className={`w-8 h-8 rounded-full ${task.bg} ${task.color} flex items-center justify-center shrink-0`}>
+                    <task.icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{task.title}</span>
+                    <span className="text-xs text-muted-foreground">{task.time}</span>
+                  </div>
+                </div>
+                <div className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${task.tagCol}`}>
+                  {task.tag}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+      
+      {/* Quick Action Floating Menu */}
+      <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-3">
+        <AnimatePresence>
+          {isQuickActionOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 15, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 15, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col gap-3 items-end mb-2"
+            >
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<div
+                    onClick={() => navigate('/documents')}
+                    className="flex items-center justify-center h-12 w-12 rounded-full bg-card border shadow-sm hover:shadow-md hover:bg-muted/50 transition-all cursor-pointer group"
+                  >
+                    <UploadCloud className="h-5 w-5 text-indigo-500 group-hover:scale-110 transition-transform" />
+                  </div>} />
+                  <TooltipContent side="left">
+                    <p>Upload Document</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<div
+                    onClick={() => navigate('/chat')}
+                    className="flex items-center justify-center h-12 w-12 rounded-full bg-card border shadow-sm hover:shadow-md hover:bg-muted/50 transition-all cursor-pointer group"
+                  >
+                    <MessageSquare className="h-5 w-5 text-emerald-500 group-hover:scale-110 transition-transform" />
+                  </div>} />
+                  <TooltipContent side="left">
+                    <p>New Chat</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<div
+                    onClick={() => navigate('/notes')}
+                    className="flex items-center justify-center h-12 w-12 rounded-full bg-card border shadow-sm hover:shadow-md hover:bg-muted/50 transition-all cursor-pointer group"
+                  >
+                    <FileText className="h-5 w-5 text-amber-500 group-hover:scale-110 transition-transform" />
+                  </div>} />
+                  <TooltipContent side="left">
+                    <p>Add Note</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <button
+          onClick={() => setIsQuickActionOpen(!isQuickActionOpen)}
+          className={`flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 z-50 ${isQuickActionOpen ? 'rotate-45' : ''}`}
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+    </div>
+  );
+}

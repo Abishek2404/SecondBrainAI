@@ -2,6 +2,7 @@ import mongoose, { Document as MongooseDocument, Schema } from 'mongoose';
 
 export interface IFolder extends MongooseDocument {
   name: string;
+  color?: string;
   user: mongoose.Types.ObjectId;
 }
 
@@ -11,6 +12,10 @@ const FolderSchema: Schema<IFolder> = new Schema(
       type: String,
       required: [true, 'Please add a folder name'],
       trim: true,
+    },
+    color: {
+      type: String,
+      default: 'indigo',
     },
     user: {
       type: Schema.Types.ObjectId,

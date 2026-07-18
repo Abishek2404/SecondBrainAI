@@ -220,13 +220,28 @@ export async function generateAnswer(query: string, history: any[], contextChunk
       });
       return response.text || "I'm sorry, I couldn't generate a response.";
     } catch (error: any) {
-      if (attempt === retries - 1) throw error;
       const errorStr = String(error);
-      if (errorStr.includes('429') || errorStr.includes('503') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('UNAVAILABLE')) {
-        console.warn(`generateContent rate limit/503 hit, retrying attempt ${attempt + 1} in 5s...`);
+      if (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+        console.warn(`gemini-2.5-flash quota error, falling back to gemini-2.5-flash...`);
+        try {
+          const fallbackResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: {
+              systemInstruction: systemInstruction,
+            }
+          });
+          return fallbackResponse.text || "I'm sorry, I couldn't generate a response.";
+        } catch (fallbackError) {
+          if (attempt === retries - 1) throw fallbackError;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      } else if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
+        if (attempt === retries - 1) throw error;
+        console.warn(`generateContent 503 hit, retrying attempt ${attempt + 1} in 5s...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       } else {
-        throw error;
+        if (attempt === retries - 1) throw error;
       }
     }
   }
@@ -240,13 +255,25 @@ export async function generateContentWithRetry(params: any, retries = 3): Promis
       const response = await ai.models.generateContent(params);
       return response;
     } catch (error: any) {
-      if (attempt === retries - 1) throw error;
       const errorStr = String(error);
-      if (errorStr.includes('429') || errorStr.includes('503') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('UNAVAILABLE')) {
+      if (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+        console.warn(`generateContent quota error, falling back to gemini-2.5-flash...`);
+        try {
+          const fallbackResponse = await ai.models.generateContent({
+            ...params,
+            model: 'gemini-2.5-flash'
+          });
+          return fallbackResponse;
+        } catch (fallbackError) {
+          if (attempt === retries - 1) throw fallbackError;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      } else if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
+        if (attempt === retries - 1) throw error;
         console.warn(`generateContent rate limit/503 hit, retrying attempt ${attempt + 1} in 5s...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       } else {
-        throw error;
+        if (attempt === retries - 1) throw error;
       }
     }
   }

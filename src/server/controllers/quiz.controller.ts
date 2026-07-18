@@ -166,3 +166,80 @@ export const deleteQuiz = async (req: Request, res: Response, next: NextFunction
     next(error);
   }
 };
+export const getDailyQuiz = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?._id;
+    
+    // Check if daily quiz already exists for today
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const existingDailyQuiz = await Quiz.findOne({
+      user: userId,
+      isDaily: true,
+      createdAt: { $gte: startOfDay }
+    });
+
+    if (existingDailyQuiz) {
+      return res.status(200).json({ success: true, data: existingDailyQuiz });
+    }
+
+    // Generate a new one
+    // 1. Get user's documents
+    const documents = await Document.find({ user: userId });
+    if (documents.length === 0) {
+      return res.status(200).json({ success: true, data: null, message: "No documents to generate quiz from." });
+    }
+
+    // 2. Pick a random document
+    const randomDoc = documents[Math.floor(Math.random() * documents.length)];
+    
+    // 3. Get chunks from that document
+    const chunks = await DocumentChunk.find({ document: randomDoc._id }).sort('chunkIndex');
+    if (chunks.length === 0) {
+        return res.status(200).json({ success: true, data: null, message: "Selected document has no text to generate quiz." });
+    }
+    
+    let fullText = chunks.slice(0, 50).map(c => c.text).join('\n\n');
+    let prompt = `Generate a daily refresher quiz (medium difficulty) with 5 multiple-choice questions based on the following text.
+Return ONLY a valid JSON array of objects.
+Each object MUST have:
+- 'question' (string)
+- 'options' (array of strings, typically 4 options)
+- 'correctAnswerIndex' (number, the index of the correct option 0-based)
+- 'explanation' (string, why the answer is correct)
+
+Document Content:\n${fullText}`;
+
+    const genAI = getAI();
+    const response = await generateContentWithRetry({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+
+    let content = response.text || "[]";
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let questions = [];
+    try {
+      questions = JSON.parse(content);
+    } catch (err) {
+      console.error("Failed to parse daily quiz JSON:", content);
+      return res.status(200).json({ success: true, data: null, message: "Failed to generate daily quiz." });
+    }
+
+    const quiz = await Quiz.create({
+      title: `Daily Quiz - ${randomDoc.title}`,
+      subject: randomDoc.subject || 'Daily Review',
+      document: randomDoc._id,
+      user: userId,
+      questions,
+      isDaily: true
+    });
+
+    res.status(201).json({ success: true, data: quiz });
+  } catch (error) {
+    console.error("Daily Quiz Gen Error:", error);
+    next(error);
+  }
+};

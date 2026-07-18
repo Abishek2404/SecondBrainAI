@@ -124,10 +124,10 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
 
 export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, bio, learningGoal, preferredLanguage, timeZone, avatar } = req.body;
+    const { name, bio, learningGoal, preferredLanguage, timeZone, avatar, dailyTasksGoal, dailyHoursGoal } = req.body;
     const user = await User.findByIdAndUpdate(
       req.user?._id,
-      { name, bio, learningGoal, preferredLanguage, timeZone, avatar },
+      { name, bio, learningGoal, preferredLanguage, timeZone, avatar, dailyTasksGoal, dailyHoursGoal },
       { new: true, runValidators: true }
     );
     res.status(200).json({

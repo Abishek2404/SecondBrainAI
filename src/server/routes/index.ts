@@ -9,6 +9,7 @@ import flashcardsRoutes from './flashcards.routes';
 import quizRoutes from './quiz.routes';
 import plannerRoutes from './planner.routes';
 import dashboardRoutes from './dashboard.routes';
+import searchRoutes from './search.routes';
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.use('/flashcards', flashcardsRoutes);
 router.use('/quizzes', quizRoutes);
 router.use('/planner', plannerRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/search', searchRoutes);
 
 // Export router
 export default router;

@@ -75,51 +75,6 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // RAG / AI Chat Mock Endpoint
-  app.post("/api/chat", async (req, res) => {
-    try {
-      const { message, history } = req.body;
-      const apiKey = process.env.GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
-      let retries = 3;
-      let response;
-      for (let attempt = 0; attempt < retries; attempt++) {
-        try {
-          response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: message }]
-              }
-            ]
-          });
-          break;
-        } catch (error: any) {
-          if (attempt === retries - 1) throw error;
-          const errorStr = String(error);
-          if (errorStr.includes('429') || errorStr.includes('503') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('UNAVAILABLE')) {
-            console.warn(`chat rate limit/503 hit, retrying attempt ${attempt + 1} in 5s...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          } else {
-            throw error;
-          }
-        }
-      }
-
-      res.json({ reply: response?.text || "I'm sorry, I couldn't generate a response." });
-    } catch (error: any) {
-      console.error("Chat Error:", error);
-      res.status(500).json({ error: "Failed to process chat" });
-    }
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

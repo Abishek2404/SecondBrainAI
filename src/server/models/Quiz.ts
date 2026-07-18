@@ -13,6 +13,7 @@ export interface IQuiz extends MongooseDocument {
   questions: IQuestion[];
   user: mongoose.Types.ObjectId;
   document?: mongoose.Types.ObjectId;
+  isDaily?: boolean;
 }
 
 const QuizSchema: Schema<IQuiz> = new Schema(
@@ -42,6 +43,10 @@ const QuizSchema: Schema<IQuiz> = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Document',
     },
+    isDaily: {
+      type: Boolean,
+      default: false
+    }
   },
   {
     timestamps: true,

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import { GoogleGenAI } from '@google/genai';
 
 export const extractTextFromFile = async (filePath: string, mimeType: string, originalName?: string): Promise<string> => {
   console.log(`Starting extraction for: ${originalName || filePath} (MIME: ${mimeType})`);
@@ -9,6 +10,7 @@ export const extractTextFromFile = async (filePath: string, mimeType: string, or
     console.log(`File size: ${stats.size} bytes, Storage path: ${filePath}`);
 
     let text = "";
+
     if (mimeType === 'application/pdf') {
       console.log('Parser selected: pdf-parse');
       const dataBuffer = fs.readFileSync(filePath);
@@ -27,8 +29,46 @@ export const extractTextFromFile = async (filePath: string, mimeType: string, or
       text = fs.readFileSync(filePath, 'utf8');
     }
     else if (mimeType.startsWith('image/')) {
-      console.log('Parser selected: OCR placeholder');
-      return "OCR not implemented";
+      console.log('Parser selected: Gemini Vision OCR');
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is missing for image analysis");
+      }
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const imageBuffer = fs.readFileSync(filePath);
+      
+      let textResponse = "";
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-pro',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: "Extract all text and describe the contents of this image in detail. Make sure to capture any data or important information. Structure it nicely." },
+                { inlineData: { data: imageBuffer.toString("base64"), mimeType } }
+              ]
+            }
+          ]
+        });
+        textResponse = response.text || "";
+      } catch (err: any) {
+        console.warn("gemini-2.5-pro failed, falling back to gemini-2.5-flash", err.message);
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: "Extract all text and describe the contents of this image in detail. Make sure to capture any data or important information. Structure it nicely." },
+                { inlineData: { data: imageBuffer.toString("base64"), mimeType } }
+              ]
+            }
+          ]
+        });
+        textResponse = response.text || "";
+      }
+      
+      text = textResponse;
     }
     else {
       throw new Error(`Unsupported file type for extraction: ${mimeType}`);

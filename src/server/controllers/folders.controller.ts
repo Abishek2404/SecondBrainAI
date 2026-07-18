@@ -13,17 +13,47 @@ export const getFolders = async (req: Request, res: Response, next: NextFunction
     const folderIds = folders.map(f => f._id);
     const documentCounts = await Document.aggregate([
       { $match: { folder: { $in: folderIds }, user: req.user?._id } },
-      { $group: { _id: '$folder', count: { $sum: 1 } } }
+      { $group: { _id: '$folder', count: { $sum: 1 }, mimeTypes: { $push: '$mimeType' } } }
     ]);
     
-    const countMap = new Map(documentCounts.map(item => [item._id.toString(), item.count]));
+    const countMap = new Map(documentCounts.map(item => [item._id.toString(), { count: item.count, mimeTypes: item.mimeTypes }]));
 
-    const foldersWithCounts = folders.map(folder => ({
-      _id: folder._id,
-      name: folder.name,
-      createdAt: (folder as any).createdAt,
-      files: countMap.get(folder._id.toString()) || 0
-    }));
+    const foldersWithCounts = folders.map(folder => {
+      const folderData = countMap.get(folder._id.toString()) || { count: 0, mimeTypes: [] };
+      
+      // Determine predominant type
+      let predominantType = 'folder';
+      if (folderData.mimeTypes.length > 0) {
+        const typeCounts = folderData.mimeTypes.reduce((acc: any, type: string) => {
+          let genericType = 'folder';
+          if (type === 'application/pdf') genericType = 'pdf';
+          else if (type.startsWith('image/')) genericType = 'image';
+          else if (type === 'text/markdown' || type === 'text/plain') genericType = 'text';
+          else if (type.includes('word') || type.includes('document')) genericType = 'document';
+          else if (type.includes('excel') || type.includes('spreadsheet')) genericType = 'spreadsheet';
+          
+          acc[genericType] = (acc[genericType] || 0) + 1;
+          return acc;
+        }, {});
+        
+        let maxCount = 0;
+        for (const [type, count] of Object.entries(typeCounts)) {
+          if (count as number > maxCount) {
+            maxCount = count as number;
+            predominantType = type;
+          }
+        }
+      }
+
+      return {
+        _id: folder._id,
+        name: folder.name,
+        color: (folder as any).color,
+        createdAt: (folder as any).createdAt,
+        files: folderData.count,
+        folderType: predominantType
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -39,7 +69,7 @@ export const getFolders = async (req: Request, res: Response, next: NextFunction
 // @route   POST /api/folders
 export const createFolder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name } = req.body;
+    const { name, color } = req.body;
     
     if (!name) {
       return next(new AppError('Please provide a folder name', 400));
@@ -47,6 +77,7 @@ export const createFolder = async (req: Request, res: Response, next: NextFuncti
 
     const folder = await Folder.create({
       name,
+      color: color || 'indigo',
       user: req.user?._id,
     });
 
@@ -55,6 +86,7 @@ export const createFolder = async (req: Request, res: Response, next: NextFuncti
       data: {
         _id: folder._id,
         name: folder.name,
+        color: folder.color,
         files: 0
       },
     });
@@ -78,7 +110,10 @@ export const updateFolder = async (req: Request, res: Response, next: NextFuncti
       return next(new AppError(`User not authorized to update this folder`, 401));
     }
 
-    folder = await Folder.findByIdAndUpdate(req.params.id, { name: req.body.name }, {
+    folder = await Folder.findByIdAndUpdate(req.params.id, { 
+      name: req.body.name,
+      ...(req.body.color ? { color: req.body.color } : {})
+    }, {
       new: true,
       runValidators: true,
     });

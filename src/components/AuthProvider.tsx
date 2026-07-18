@@ -18,6 +18,19 @@ export interface User {
   subscriptionPlan?: string;
   createdAt?: string;
   updatedAt?: string;
+  currentStreak?: number;
+  longestStreak?: number;
+  lastCompletedDate?: string;
+  todayCompleted?: boolean;
+  xp?: number;
+  level?: number;
+  coins?: number;
+  focusPoints?: number;
+  totalTasksCompleted?: number;
+  studyDays?: string[];
+  achievements?: string[];
+  dailyTasksGoal?: number;
+  dailyHoursGoal?: number;
 }
 
 interface AuthContextType {

@@ -19,6 +19,19 @@ export interface IUser extends Document {
   resetPasswordExpire?: Date;
   createdAt?: Date;
   updatedAt?: Date;
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: string;
+  todayCompleted: boolean;
+  xp: number;
+  level: number;
+  coins: number;
+  focusPoints: number;
+  totalTasksCompleted: number;
+  studyDays: string[];
+  achievements: string[];
+  dailyTasksGoal: number;
+  dailyHoursGoal: number;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -80,6 +93,58 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    currentStreak: {
+      type: Number,
+      default: 0,
+    },
+    longestStreak: {
+      type: Number,
+      default: 0,
+    },
+    lastCompletedDate: {
+      type: String,
+      default: '',
+    },
+    todayCompleted: {
+      type: Boolean,
+      default: false,
+    },
+    xp: {
+      type: Number,
+      default: 0,
+    },
+    level: {
+      type: Number,
+      default: 1,
+    },
+    coins: {
+      type: Number,
+      default: 0,
+    },
+    focusPoints: {
+      type: Number,
+      default: 0,
+    },
+    totalTasksCompleted: {
+      type: Number,
+      default: 0,
+    },
+    studyDays: {
+      type: [String],
+      default: [],
+    },
+    achievements: {
+      type: [String],
+      default: [],
+    },
+    dailyTasksGoal: {
+      type: Number,
+      default: 4,
+    },
+    dailyHoursGoal: {
+      type: Number,
+      default: 2,
+    },
   },
   {
     timestamps: true,

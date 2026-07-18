@@ -1,5 +1,5 @@
 import express from 'express';
-import { getQuizzes, getQuiz, generateQuiz, submitAttempt, deleteQuiz } from '../controllers/quiz.controller';
+import { getQuizzes, getQuiz, generateQuiz, submitAttempt, deleteQuiz, getDailyQuiz } from '../controllers/quiz.controller';
 import { protect } from '../middlewares/auth';
 
 const router = express.Router();
@@ -10,6 +10,8 @@ router.route('/')
   .get(getQuizzes);
 
 router.post('/generate', generateQuiz);
+
+router.get('/daily', getDailyQuiz);
 
 router.route('/:id')
   .get(getQuiz)

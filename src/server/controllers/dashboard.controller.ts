@@ -5,12 +5,14 @@ import { FlashcardDeck } from '../models/FlashcardDeck';
 import { QuizAttempt } from '../models/QuizAttempt';
 import { StudyPlan } from '../models/StudyPlan';
 import { Note } from '../models/Note';
+import { User } from '../models/User';
 
 // @desc    Get dashboard analytics
 // @route   GET /api/analytics
 export const getDashboardStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?._id;
+    const user = await User.findById(userId);
 
     // 1. Documents count
     const totalDocuments = await Document.countDocuments({ user: userId });
@@ -46,6 +48,7 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
     const plans = await StudyPlan.find({ user: userId });
     let completedTasks = 0;
     let totalTasks = 0;
+    let todayCompletedTasks = 0;
     
     const today = new Date().toISOString().split('T')[0];
     const upcomingTasks: any[] = [];
@@ -53,8 +56,10 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
     plans.forEach(plan => {
       plan.tasks.forEach(t => {
         totalTasks++;
-        if (t.status === 'completed') completedTasks++;
-        else if (plan.date >= today) {
+        if (t.status === 'completed') {
+          completedTasks++;
+          if (plan.date === today) todayCompletedTasks++;
+        } else if (plan.date >= today) {
           upcomingTasks.push({
             title: t.title,
             date: plan.date,
@@ -301,9 +306,51 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
       }
     }
 
+    const todayPlan = await StudyPlan.findOne({ user: userId, date: todayStr });
+    const todayTasks = todayPlan ? todayPlan.tasks || [] : [];
+
+    
+    // 7. Recent Activity
+    const recentDocsAct = await Document.find({ user: userId }).sort("-createdAt").limit(5).select("title createdAt");
+    const recentNotesAct = await Note.find({ user: userId }).sort("-createdAt").limit(5).select("title createdAt");
+    const recentQuizzesAct = await QuizAttempt.find({ user: userId }).populate("quiz", "title").sort("-createdAt").limit(5).select("score createdAt quiz");
+    const recentDecksAct = await FlashcardDeck.find({ user: userId }).sort("-createdAt").limit(5).select("title createdAt");
+
+    let activities: any[] = [];
+
+    recentDocsAct.forEach((d: any) => activities.push({
+      title: `You uploaded document "${d.title}"`,
+      createdAt: d.createdAt,
+      type: "document"
+    }));
+
+    recentNotesAct.forEach((n: any) => activities.push({
+      title: `You created note "${n.title}"`,
+      createdAt: n.createdAt,
+      type: "note"
+    }));
+
+    recentQuizzesAct.forEach((q: any) => activities.push({
+      title: `You scored ${q.score}% on quiz "${q.quiz?.title || "Quiz"}"`,
+      createdAt: q.createdAt,
+      type: "quiz"
+    }));
+
+    recentDecksAct.forEach((d: any) => activities.push({
+      title: `You created flashcard deck "${d.title}"`,
+      createdAt: d.createdAt,
+      type: "deck"
+    }));
+
+    // Sort by createdAt descending
+    activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    activities = activities.slice(0, 8); // Top 8 recent activities
+
     res.status(200).json({
       success: true,
       data: {
+        recentActivity: activities,
+
         totalDocuments,
         totalNotes,
         totalFlashcards,
@@ -312,12 +359,20 @@ export const getDashboardStats = async (req: Request, res: Response, next: NextF
         totalQuizzesTaken,
         avgQuizScore,
         completedTasks,
+        todayCompletedTasks,
         totalTasks,
         subjectPerformance,
         upcomingTasks,
         studyDistribution,
+        todayTasks,
         totalStudyHours: Math.round(totalStudyHours * 10) / 10,
-        studyStreak
+        studyStreak: user && user.currentStreak !== undefined ? user.currentStreak : studyStreak,
+        longestStreak: user && user.longestStreak !== undefined ? user.longestStreak : studyStreak,
+        xp: user && user.xp !== undefined ? user.xp : 0,
+        level: user && user.level !== undefined ? user.level : 1,
+        coins: user && user.coins !== undefined ? user.coins : 0,
+        focusPoints: user && user.focusPoints !== undefined ? user.focusPoints : 0,
+        achievements: user && user.achievements !== undefined ? user.achievements : []
       }
     });
   } catch (error) {
