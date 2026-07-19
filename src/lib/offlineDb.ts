@@ -286,7 +286,7 @@ export async function performOptimisticUpdates(
         type: bodyData.type || "Summary",
         words: bodyData.content ? bodyData.content.split(/\s+/).length : 50,
         subject: bodyData.subject || "General",
-        tags: bodyData.tags || ["offline"],
+        
         importance: bodyData.importance || "medium",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

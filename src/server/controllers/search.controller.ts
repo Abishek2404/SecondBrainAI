@@ -22,8 +22,8 @@ export const globalSearch = async (req: Request, res: Response, next: NextFuncti
     // Search Notes
     const notes = await Note.find({
       user: req.user?._id,
-      $or: [{ title: regex }, { content: regex }, { tags: regex }]
-    }).select('title content tags createdAt _id');
+      $or: [{ title: regex }, { content: regex }]
+    }).select('title content createdAt _id');
 
     // Search Quizzes
     const quizzes = await Quiz.find({

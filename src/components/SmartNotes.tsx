@@ -1,5 +1,5 @@
 import { apiFetch } from '../lib/api';
-import { BookOpen, Search, Plus, Sparkles, Filter, MoreVertical, FileText, Trash, Edit2, Save, Loader2, Tag, X, AlertCircle, Maximize2, Minimize2, Check } from "lucide-react";
+import { LayoutGrid, List, Star, Image as ImageIcon, BookOpen, Search, Plus, Sparkles, Filter, MoreVertical, FileText, Trash, Edit2, Save, Loader2, Tag, X, AlertCircle, Maximize2, Minimize2, Check } from "lucide-react";
 import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { Input } from "./ui/input";
@@ -29,7 +29,11 @@ export function SmartNotes() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Filter state
+  const [filterType, setFilterType] = useState<string>("all");
   const [filterImportance, setFilterImportance] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("latest");
+  const [viewMode, setViewMode] = useState<"grid"|"list">("grid");
+  const [activeCategory, setActiveCategory] = useState<string>("All Notes");
   const [filterSubject, setFilterSubject] = useState<string>("all");
 
   // Tag input state
@@ -74,25 +78,7 @@ export function SmartNotes() {
     }
   };
 
-  const saveNoteTags = async (tags: string[], noteId: string) => {
-    try {
-      const res = await apiFetch(`/api/notes/${noteId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags })
-      });
-      if (res.ok) {
-        setNotes(prev => prev.map(n => n._id === noteId ? { ...n, tags } : n));
-        if (selectedNote && selectedNote._id === noteId) {
-          setSelectedNote({ ...selectedNote, tags });
-        }
-      }
-    } catch (error) {
-      console.error("Failed to update tags", error);
-    }
-  };
-
-  const saveNoteImportance = async (importance: string, noteId: string) => {
+    const saveNoteImportance = async (importance: string, noteId: string) => {
     try {
       const res = await apiFetch(`/api/notes/${noteId}`, {
         method: 'PUT',
@@ -212,11 +198,33 @@ export function SmartNotes() {
     }
   };
 
+  const getCategorySearch = (cat) => {
+    if (cat === 'Summaries') return 'summary';
+    if (cat === 'Important Questions') return 'important question';
+    if (cat === 'Cheat Sheets') return 'cheat sheet';
+    if (cat === 'Mind Maps') return 'mind map';
+    return cat.toLowerCase();
+  };
+
   const filteredNotes = notes.filter(n => {
     const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesImportance = filterImportance === "all" || n.importance === filterImportance;
     const matchesSubject = filterSubject === "all" || n.subject === filterSubject;
-    return matchesSearch && matchesImportance && matchesSubject;
+    const matchesType = filterType === "all" || (n.type && n.type.toLowerCase().includes(filterType.toLowerCase()));
+    
+    let matchesCategory = true;
+    if (activeCategory === 'Others') {
+       matchesCategory = !['summary', 'important question', 'cheat sheet', 'mind map'].some(t => n.type?.toLowerCase().includes(t));
+    } else if (activeCategory !== 'All Notes') {
+       matchesCategory = !!(n.type && n.type.toLowerCase().includes(getCategorySearch(activeCategory)));
+    }
+    
+    return matchesSearch && matchesImportance && matchesSubject && matchesType && matchesCategory;
+  }).sort((a, b) => {
+    if (sortBy === 'latest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (sortBy === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (sortBy === 'a-z') return a.title.localeCompare(b.title);
+    return 0;
   });
 
   const uniqueSubjects = Array.from(new Set(notes.map(n => n.subject).filter(Boolean)));
@@ -232,7 +240,7 @@ export function SmartNotes() {
             <p className="text-muted-foreground text-sm">AI-generated summaries, cheat sheets, and study materials.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button className="w-full sm:w-auto gap-2 rounded-xl h-10 shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsDialogOpen(true)}>
+            <Button className="w-full sm:w-auto gap-2 rounded-xl h-10 shadow-sm bg-black hover:bg-black/90 text-white" onClick={() => setIsDialogOpen(true)}>
               <Sparkles className="h-4 w-4" />
               Generate Notes
             </Button>
@@ -260,28 +268,7 @@ export function SmartNotes() {
               </div>
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground truncate">{selectedNote.title}</h2>
               
-              <div className="flex flex-wrap items-center gap-2 mt-4">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                {selectedNote.tags?.map((tag: string) => (
-                  <Badge key={tag} variant="outline" className="text-xs h-6 px-2.5 rounded-lg bg-background border-border/50 gap-1.5 font-medium text-muted-foreground">
-                    {tag}
-                    <button onClick={() => saveNoteTags(selectedNote.tags.filter((t: string) => t !== tag), selectedNote._id)} className="hover:text-foreground">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {isEditing && (
-                  <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if (tagInput.trim() && !selectedNote.tags?.includes(tagInput.trim())) {
-                        saveNoteTags([...(selectedNote.tags || []), tagInput.trim()], selectedNote._id);
-                        setTagInput("");
-                      }
-                    }}>
-                    <Input className="h-6 text-xs w-24 px-2 py-0 rounded-lg bg-background" placeholder="Add tag..." value={tagInput} onChange={e => setTagInput(e.target.value)} />
-                  </form>
-                )}
-              </div>
+              
             </div>
             
             <div className="flex items-center gap-2 shrink-0">
@@ -325,21 +312,34 @@ export function SmartNotes() {
         </motion.div>
       ) : (
         <>
-          <div className="flex flex-col sm:flex-row items-center gap-4 bg-card p-2 rounded-2xl border shadow-sm">
-            <div className="relative flex-1 w-full">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search your notes..." 
-                className="pl-9 bg-transparent border-none shadow-none focus-visible:ring-0 h-9"
+                className="pl-9 h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-indigo-500 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="hidden sm:block w-px h-6 bg-border mx-2" />
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="summary">Summary</SelectItem>
+                  <SelectItem value="important question">Important Questions</SelectItem>
+                  <SelectItem value="cheat sheet">Cheat Sheets</SelectItem>
+                  <SelectItem value="mind map">Mind Maps</SelectItem>
+                </SelectContent>
+              </Select>
+              
               <Select value={filterSubject} onValueChange={setFilterSubject}>
-                <SelectTrigger className="w-full sm:w-[150px] bg-transparent border-none shadow-none font-medium h-9 focus:ring-0">
-                  <SelectValue placeholder="Subject" />
+                <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">
+                  <SelectValue placeholder="All Subjects" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   <SelectItem value="all">All Subjects</SelectItem>
@@ -349,21 +349,45 @@ export function SmartNotes() {
                 </SelectContent>
               </Select>
               
-              <Select value={filterImportance} onValueChange={setFilterImportance}>
-                <SelectTrigger className="w-full sm:w-[150px] bg-transparent border-none shadow-none font-medium h-9 focus:ring-0">
-                  <SelectValue placeholder="Importance" />
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">
+                  <SelectValue placeholder="Sort: Latest" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="all">Any Importance</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="latest">Sort: Latest</SelectItem>
+                  <SelectItem value="oldest">Sort: Oldest</SelectItem>
+                  <SelectItem value="a-z">Sort: A-Z</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="flex items-center gap-1 border bg-card rounded-xl p-1 shadow-sm shrink-0">
+               <Button variant="ghost" size="icon" onClick={() => setViewMode("grid")} className={`h-9 w-9 rounded-lg ${viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}><LayoutGrid className="h-4 w-4" /></Button>
+               <Button variant="ghost" size="icon" onClick={() => setViewMode("list")} className={`h-9 w-9 rounded-lg ${viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}><List className="h-4 w-4" /></Button>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2 mt-2 mb-4">
+            {['All Notes', 'Summaries', 'Important Questions', 'Cheat Sheets', 'Mind Maps', 'Others'].map((cat) => {
+               const isActive = activeCategory === cat;
+               let count = 0;
+               if (cat === 'All Notes') count = notes.length;
+               else if (cat === 'Others') count = notes.filter(n => !['summary', 'important question', 'cheat sheet', 'mind map'].some(t => n.type?.toLowerCase().includes(t))).length;
+               else count = notes.filter(n => n.type?.toLowerCase().includes(getCategorySearch(cat))).length;
+               
+               return (
+                 <button 
+                   key={cat}
+                   onClick={() => setActiveCategory(cat)}
+                   className={`rounded-full px-4 py-2 text-sm font-medium cursor-pointer transition-colors ${isActive ? 'bg-black text-white hover:bg-black/90' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-transparent'}`}
+                 >
+                   {cat} ({count})
+                 </button>
+               )
+            })}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
+          <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'} gap-6 pb-12`}>
             {loading ? (
               <>
                  <DocumentCardSkeleton />
@@ -378,69 +402,110 @@ export function SmartNotes() {
                  </div>
                  <h3 className="text-xl font-bold mb-2">No notes available</h3>
                  <p className="text-muted-foreground mb-6 max-w-sm">Generate beautiful AI notes from any document or write your own from scratch.</p>
-                 <Button className="rounded-xl shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsDialogOpen(true)}>
+                 <Button className="rounded-xl shadow-sm bg-black hover:bg-black/90 text-white" onClick={() => setIsDialogOpen(true)}>
                    Generate Notes
                  </Button>
               </div>
             ) : (
-              filteredNotes.map((note) => (
-                <motion.div 
-                  whileHover={{ y: -4 }}
-                  key={note._id} 
-                  className="flex flex-col p-6 rounded-3xl border bg-card hover:shadow-lg transition-all cursor-pointer group h-[320px] relative overflow-hidden" 
-                  onClick={() => setSelectedNote(note)}
-                >
-                  {/* Bento-style accent block */}
-                  <div className={`absolute left-0 top-0 w-1 h-full ${note.importance === 'high' ? 'bg-red-500' : note.importance === 'medium' ? 'bg-orange-500' : 'bg-indigo-500'}`} />
-                  
-                  <div className="flex justify-between items-start mb-4">
-                    <Badge variant="secondary" className="font-semibold bg-muted text-muted-foreground hover:bg-muted">{note.type}</Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={
-                        <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 -mr-2" onClick={e => e.stopPropagation()}>
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      } />
-                      <DropdownMenuContent align="end" className="rounded-xl">
-                        <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2 rounded-lg" onClick={() => { setItemToDelete(note._id); }}>
-                          <Trash className="h-4 w-4" /> Delete Note
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  
-                  <h3 className="font-bold text-xl leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
-                    {note.title}
-                  </h3>
-                  
-                  <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground mb-4">
-                    <span>{note.subject}</span>
-                    <span className="w-1 h-1 rounded-full bg-border" />
-                    <span>{new Date(note.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  
-                  <div className="flex-1 overflow-hidden relative">
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
-                      {note.summary || note.content.substring(0, 150)}...
-                    </p>
-                    <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-card to-transparent" />
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
-                     <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                        <FileText className="h-3.5 w-3.5" />
-                        {note.words} words
-                     </div>
-                     {note.tags && note.tags.length > 0 && (
-                       <div className="flex items-center gap-1 max-w-[50%] overflow-hidden">
-                         {note.tags.slice(0, 2).map((tag: string) => (
-                           <span key={tag} className="text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded-md truncate max-w-[60px]">{tag}</span>
-                         ))}
-                       </div>
-                     )}
-                  </div>
-                </motion.div>
-              ))
+              filteredNotes.map((note) => {
+                const sourceDoc = documents.find(d => d._id === note.document);
+                const sourceName = sourceDoc?.originalName || "Source Document";
+                
+                let typeColor = "bg-purple-50 text-purple-600 border-purple-100";
+                if (note.type?.toLowerCase().includes("question")) typeColor = "bg-orange-50 text-orange-600 border-orange-100";
+                else if (note.type?.toLowerCase().includes("cheat")) typeColor = "bg-blue-50 text-blue-600 border-blue-100";
+                else if (note.type?.toLowerCase().includes("mind map") || note.type?.toLowerCase().includes("map")) typeColor = "bg-emerald-50 text-emerald-600 border-emerald-100";
+
+                let icon = <FileText className="h-3.5 w-3.5" />;
+                let statText = `${note.words || 0} words`;
+                if (note.type?.toLowerCase().includes("question")) {
+                  statText = `${Math.floor((note.words || 0) / 20) || 5} questions`;
+                } else if (note.type?.toLowerCase().includes("cheat")) {
+                  statText = `${Math.floor((note.words || 0) / 300) || 1} pages`;
+                } else if (note.type?.toLowerCase().includes("map")) {
+                  statText = "1 image";
+                  icon = <ImageIcon className="h-3.5 w-3.5" />;
+                }
+
+                const dateStr = new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                return (
+                  <motion.div 
+                    whileHover={{ y: -4 }}
+                    key={note._id} 
+                    className={`flex flex-col p-5 rounded-2xl border bg-card hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden ${viewMode === 'list' ? 'h-auto sm:flex-row sm:items-center sm:gap-6' : 'h-[300px]'}`}
+                    onClick={() => setSelectedNote(note)}
+                  >
+                    <div className={`flex justify-between items-start mb-4 ${viewMode === 'list' ? 'sm:mb-0 sm:w-48 sm:shrink-0' : ''}`}>
+                      <Badge variant="outline" className={`font-semibold rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-wider ${typeColor}`}>
+                        {note.type}
+                      </Badge>
+                      <div className={`flex items-center gap-1 ${viewMode === 'list' ? 'sm:hidden' : ''}`}>
+                        {note.importance === 'high' && <Star className="h-4 w-4 text-amber-400 fill-amber-400" />}
+                        {!note.importance || note.importance !== 'high' ? <Star className="h-4 w-4 text-muted-foreground/30 hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" /> : null}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={
+                            <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 -mr-2" onClick={e => e.stopPropagation()}>
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          } />
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2 rounded-lg" onClick={(e) => { e.stopPropagation(); setItemToDelete(note._id); }}>
+                              <Trash className="h-4 w-4" /> Delete Note
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    
+                    <div className={`flex flex-col flex-1 min-w-0 ${viewMode === 'list' ? '' : ''}`}>
+                      <h3 className="font-bold text-lg leading-tight mb-1.5 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                        {note.title}
+                      </h3>
+                      
+                      <div className="text-[12px] font-medium text-muted-foreground mb-3 truncate">
+                        {sourceName}
+                      </div>
+                      
+                      <div className={`flex-1 overflow-hidden relative ${viewMode === 'list' ? 'hidden sm:block' : ''}`}>
+                        <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">
+                          {note.summary || note.content.substring(0, 150)}...
+                        </p>
+                      </div>
+                      
+                      <div className={`mt-4 pt-4 flex items-center justify-between border-t border-border/50 ${viewMode === 'list' ? 'sm:border-t-0 sm:pt-0 sm:mt-0 sm:border-l sm:pl-6 sm:ml-6 sm:w-48 sm:shrink-0 sm:flex-col sm:items-start sm:justify-center sm:gap-2' : ''}`}>
+                         <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                            {icon}
+                            {statText}
+                         </div>
+                         <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            {dateStr}
+                         </div>
+                      </div>
+                    </div>
+                    
+                    {viewMode === 'list' && (
+                      <div className="hidden sm:flex items-center gap-1 shrink-0 ml-4">
+                        {note.importance === 'high' && <Star className="h-4 w-4 text-amber-400 fill-amber-400" />}
+                        {!note.importance || note.importance !== 'high' ? <Star className="h-4 w-4 text-muted-foreground/30 hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" /> : null}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={
+                            <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors opacity-0 group-hover:opacity-100" onClick={e => e.stopPropagation()}>
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          } />
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem className="text-red-500 focus:text-red-500 gap-2 rounded-lg" onClick={(e) => { e.stopPropagation(); setItemToDelete(note._id); }}>
+                              <Trash className="h-4 w-4" /> Delete Note
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })
             )}
           </div>
         </>

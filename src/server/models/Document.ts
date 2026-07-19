@@ -10,6 +10,7 @@ export interface IDocument extends MongooseDocument {
   user: mongoose.Types.ObjectId;
   folder?: mongoose.Types.ObjectId;
   status: 'processing' | 'ready' | 'failed';
+  summary?: string;
   subject?: string;
 }
 
@@ -53,9 +54,12 @@ const DocumentSchema: Schema<IDocument> = new Schema(
       enum: ['processing', 'ready', 'failed'],
       default: 'processing',
     },
+    summary: {
+      type: String,
+    },
     subject: {
       type: String,
-    }
+    },
   },
   {
     timestamps: true,

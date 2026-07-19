@@ -7,7 +7,6 @@ export interface INote extends MongooseDocument {
   type: string;
   words: number;
   subject?: string;
-  tags: string[];
   importance: 'low' | 'medium' | 'high';
   document: mongoose.Types.ObjectId;
   user: mongoose.Types.ObjectId;
@@ -37,10 +36,6 @@ const NoteSchema: Schema<INote> = new Schema(
     },
     subject: {
       type: String,
-    },
-    tags: {
-      type: [String],
-      default: [],
     },
     importance: {
       type: String,

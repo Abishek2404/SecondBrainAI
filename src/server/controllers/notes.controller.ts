@@ -166,7 +166,7 @@ export const deleteNote = async (req: Request, res: Response, next: NextFunction
 // @route   PUT /api/notes/:id
 export const updateNote = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { content, tags, importance, subject } = req.body;
+    const { content, importance, subject } = req.body;
     let note = await Note.findOne({ _id: req.params.id, user: req.user?._id });
 
     if (!note) {
@@ -178,7 +178,7 @@ export const updateNote = async (req: Request, res: Response, next: NextFunction
       note.words = content.split(/\s+/).length;
       note.summary = content.substring(0, 150) + '...';
     }
-    if (tags !== undefined) note.tags = tags;
+    
     if (importance !== undefined) note.importance = importance;
     if (subject !== undefined) note.subject = subject;
 

@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -94,9 +95,12 @@ export const uploadDocument = async (req: Request, res: Response, next: NextFunc
       try {
         const extractedText = await extractTextFromFile(req.file.path, req.file.mimetype, req.file.originalname);
         document.extractedText = extractedText;
+        
+        
         if (extractedText) {
           await processDocument(document._id.toString(), req.user?._id.toString(), extractedText);
         }
+
         document.status = 'ready';
         await document.save();
       } catch (err) {
@@ -137,6 +141,7 @@ export const updateDocument = async (req: Request, res: Response, next: NextFunc
     const updateData: any = {};
     if (req.body.title) updateData.title = req.body.title;
     if (req.body.subject) updateData.subject = req.body.subject;
+    
     
     if (req.body.folderId) {
       if (req.body.folderId === 'root') {
@@ -213,6 +218,55 @@ export const deleteDocument = async (req: Request, res: Response, next: NextFunc
     res.status(200).json({
       success: true,
       data: {},
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get document info (notes count, AI summary)
+// @route   GET /api/documents/:id/info
+
+export const getDocumentInfo = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const document = await Document.findById(req.params.id);
+    if (!document) {
+      return next(new AppError(`Document not found with id of ${req.params.id}`, 404));
+    }
+
+    // Make sure user owns document
+    if (document.user.toString() !== req.user?._id.toString() && req.user?.role !== 'admin') {
+      return next(new AppError(`User not authorized to access this document`, 401));
+    }
+
+    const notesCount = await Note.countDocuments({ document: document._id });
+
+    let summary = document.summary;
+    if (!summary && document.extractedText) {
+      // Generate summary if it doesn't exist and text is available
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Summarize the following document in a concise, informative paragraph:\n\n${document.extractedText.substring(0, 15000)}`,
+        });
+        summary = response.text || "Summary generation failed.";
+        document.summary = summary;
+        await document.save();
+      } catch (aiError) {
+         console.error("Failed to generate summary", aiError);
+         summary = "Could not generate summary at this time.";
+      }
+    } else if (!summary) {
+       summary = "No text content available to summarize.";
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        notesCount,
+        summary
+      }
     });
   } catch (error) {
     next(error);

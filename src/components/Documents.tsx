@@ -4,7 +4,9 @@ import {
   FileText, Folder, MoreVertical, Search, Plus, Filter, 
   Download, Trash, Edit2, ChevronLeft, ExternalLink, 
   LayoutGrid, List, FileType, CheckCircle2, CloudUpload, Clock,
-  Image as ImageIcon, FileSpreadsheet, File
+  Image as ImageIcon, FileSpreadsheet, File, X, ZoomIn, ZoomOut, Maximize,
+  Share2, ArrowRightLeft, PenTool, Loader2, Paperclip, 
+  ChevronDown, Minus, Upload
 } from "lucide-react";
 import { Button, buttonVariants } from "./ui/button";
 import { ConfirmDialog } from "./ui/confirm-dialog";
@@ -19,7 +21,6 @@ import { useStreak } from "./StreakProvider";
 import { motion, AnimatePresence } from "motion/react";
 
 import { DashboardCardSkeleton, DataTableSkeleton, FolderSkeleton, DocumentCardSkeleton } from "./Skeletons";
-
 
 const getColorClasses = (color) => {
   const map = {
@@ -42,9 +43,16 @@ export function Documents() {
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'document' | 'folder'} | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+  const [previewDocInfo, setPreviewDocInfo] = useState<{ notesCount: number; summary: string } | null>(null);
+  const [loadingPreviewInfo, setLoadingPreviewInfo] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderColor, setNewFolderColor] = useState("indigo");
+  const [activeTab, setActiveTab] = useState("All Documents");
+  const [sidebarTab, setSidebarTab] = useState("Details");
+  const [newTag, setNewTag] = useState("");
+  const [addingTagTo, setAddingTagTo] = useState<string | null>(null);
+  
   const folderColors = [
     { name: 'Indigo', value: 'indigo', class: 'bg-indigo-500' },
     { name: 'Emerald', value: 'emerald', class: 'bg-emerald-500' },
@@ -54,7 +62,9 @@ export function Documents() {
     { name: 'Purple', value: 'purple', class: 'bg-purple-500' },
   ];
   const [moveDocState, setMoveDocState] = useState<{ id: string, open: boolean }>({ id: "", open: false });
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [renameState, setRenameState] = useState<{ id: string, name: string, type: 'document' | 'folder', open: boolean }>({ id: "", name: "", type: "document", open: false });
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name' | 'size'>('newest');
   const [uploadingFiles, setUploadingFiles] = useState<{name: string, progress: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +116,26 @@ export function Documents() {
        loadFolderDocs();
     }
   }, [currentFolder]);
+
+  
+  useEffect(() => {
+    if (previewDoc) {
+      setLoadingPreviewInfo(true);
+      setPreviewDocInfo(null);
+      apiFetch(`/api/documents/${previewDoc._id}/info`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setPreviewDocInfo(data.data);
+          }
+        })
+        .finally(() => {
+          setLoadingPreviewInfo(false);
+        });
+    } else {
+      setPreviewDocInfo(null);
+    }
+  }, [previewDoc]);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -210,6 +240,7 @@ export function Documents() {
         toast.success("Document deleted");
         fetchDocuments();
         fetchFolders();
+        if (previewDoc?._id === id) setPreviewDoc(null);
       } else {
         toast.error("Failed to delete document");
       }
@@ -218,8 +249,16 @@ export function Documents() {
     }
   };
 
-  const handleRenameDocument = async (id: string, currentName: string) => {
-    const newTitle = prompt("Enter new name:", currentName);
+  const handleRenameSubmit = () => {
+    if (renameState.type === 'document') {
+      handleRenameDocument(renameState.id, renameState.name);
+    } else {
+      handleRenameFolder(renameState.id, renameState.name);
+    }
+    setRenameState({ ...renameState, open: false });
+  };
+
+  const handleRenameDocument = async (id: string, newTitle: string) => {
     if (!newTitle) return;
 
     try {
@@ -232,6 +271,9 @@ export function Documents() {
       if (res.ok) {
         toast.success("Document renamed");
         fetchDocuments();
+        if (previewDoc?._id === id) {
+          setPreviewDoc({ ...previewDoc, title: newTitle });
+        }
       } else {
         toast.error("Failed to rename document");
       }
@@ -240,6 +282,8 @@ export function Documents() {
     }
   };
 
+  
+  
   const handleMoveDocument = async (id: string, targetFolderId: string | 'root') => {
     try {
       const res = await apiFetch(`/api/documents/${id}`, {
@@ -260,8 +304,7 @@ export function Documents() {
     }
   };
 
-  const handleRenameFolder = async (id: string, currentName: string) => {
-    const newName = prompt("Enter new name:", currentName);
+  const handleRenameFolder = async (id: string, newName: string) => {
     if (!newName) return;
 
     try {
@@ -309,9 +352,22 @@ export function Documents() {
   };
 
   const filteredDocs = documents.filter(doc => 
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    doc.originalName?.toLowerCase().includes(searchQuery.toLowerCase())
+    (doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    doc.originalName?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (activeTab === 'All Documents' || 
+     (activeTab === 'PDF' && doc.originalName?.toLowerCase().endsWith('.pdf')) ||
+     (activeTab === 'Images' && ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(doc.originalName?.toLowerCase().split('.').pop() || '')) ||
+     (activeTab === 'Others' && !doc.originalName?.toLowerCase().endsWith('.pdf') && !['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(doc.originalName?.toLowerCase().split('.').pop() || ''))
+    )
   );
+
+  const sortedDocs = [...filteredDocs].sort((a, b) => {
+    if (sortBy === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (sortBy === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (sortBy === 'name') return a.title.localeCompare(b.title);
+    if (sortBy === 'size') return b.size - a.size;
+    return 0;
+  });
 
   const renderFolderIcon = (type: string, className: string) => {
     switch (type) {
@@ -329,455 +385,377 @@ export function Documents() {
     }
   };
 
+  const fileTypeTabs = [
+    { name: "All Documents", count: documents.length },
+    { name: "PDF", count: documents.filter(d => d.originalName?.toLowerCase().endsWith('.pdf')).length },
+    { name: "Images", count: documents.filter(d => ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(d.originalName?.toLowerCase().split('.').pop() || '')).length },
+    { name: "Others", count: documents.filter(d => !d.originalName?.toLowerCase().endsWith('.pdf') && !['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(d.originalName?.toLowerCase().split('.').pop() || '')).length },
+  ];
+
   return (
-    <div 
-      className={`relative p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-6 min-h-[calc(100vh-4rem)] transition-colors ${isDragging ? 'bg-primary/5' : ''}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <AnimatePresence>
-        {isDragging && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl m-4 border-2 border-dashed border-primary"
-          >
-            <div className="flex flex-col items-center p-8 bg-card border rounded-2xl shadow-2xl">
-              <div className="p-5 bg-primary/10 rounded-full mb-6">
-                <CloudUpload className="w-12 h-12 text-primary" />
+    <div className="flex h-full w-full bg-[#FAFAFA] overflow-hidden">
+      <div 
+        className={`flex-1 flex flex-col relative transition-all duration-300 ${isDragging ? 'bg-indigo-50/50' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <AnimatePresence>
+          {isDragging && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm m-6 rounded-3xl border-2 border-dashed border-indigo-400 shadow-2xl"
+            >
+              <div className="flex flex-col items-center">
+                <div className="p-6 bg-indigo-50 rounded-full mb-6">
+                  <CloudUpload className="w-16 h-16 text-indigo-500" />
+                </div>
+                <h3 className="text-3xl font-bold tracking-tight mb-2 text-slate-800">Drop files to upload</h3>
+                <p className="text-slate-500">Add documents to your SecondBrain.</p>
               </div>
-              <h3 className="text-2xl font-bold tracking-tight mb-2">Drop files here</h3>
-              <p className="text-muted-foreground">Upload documents to your SecondBrain.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="p-4 md:p-8 max-w-[1200px] w-full mx-auto flex-1 overflow-y-auto">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <h1 className="text-[28px] font-bold text-slate-900 tracking-tight mb-1">Documents</h1>
+              <p className="text-slate-500 text-[15px]">Manage and organize all your study materials in one place.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+                multiple
+              />
+              <Button className="gap-2 rounded-xl h-11 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 shadow-sm" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4" />
+                Upload File
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-8">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search documents by name or content..." 
+                className="pl-10 h-11 w-full rounded-xl border-slate-200 bg-white shadow-sm focus-visible:ring-indigo-500 text-[15px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="h-11 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm px-4 gap-2 font-semibold inline-flex items-center hover:bg-slate-50 transition-colors flex-1 sm:flex-none justify-center">
+                  <ArrowRightLeft className="h-4 w-4 text-slate-400 rotate-90" /> 
+                  Sort: {sortBy.charAt(0).toUpperCase() + sortBy.slice(1)} 
+                  <ChevronDown className="h-4 w-4 text-slate-400 ml-1" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSortBy('newest')}>Newest First</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy('oldest')}>Oldest First</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy('name')}>Name (A-Z)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSortBy('size')}>Size (Largest)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="flex p-1 bg-white border border-slate-200 rounded-xl shadow-sm shrink-0">
+                 <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-700'}`}>
+                   <LayoutGrid className="h-4 w-4" />
+                 </button>
+                 <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-700'}`}>
+                   <List className="h-4 w-4" />
+                 </button>
+              </div>
+            </div>
+          </div>
+
+
+          <div className="border-b border-slate-200 mb-6 flex gap-6 overflow-x-auto hide-scrollbar">
+             {fileTypeTabs.map(tab => (
+               <button 
+                 key={tab.name}
+                 onClick={() => setActiveTab(tab.name)}
+                 className={`pb-3 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                   activeTab === tab.name ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
+                 }`}
+               >
+                 {activeTab === tab.name ? (
+                   <span className="bg-slate-900 text-white px-3 py-1 rounded-full text-xs ml-0 inline-flex items-center">
+                     {tab.name} ({tab.count})
+                   </span>
+                 ) : (
+                   <span>{tab.name} ({tab.count})</span>
+                 )}
+               </button>
+             ))}
+          </div>
+
+          {viewMode === 'list' ? (
+            <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm overflow-hidden mb-8">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-6 py-4 text-[13px] font-bold text-slate-500">Name</th>
+                      <th className="px-6 py-4 text-[13px] font-bold text-slate-500">Type</th>
+                      <th className="px-6 py-4 text-[13px] font-bold text-slate-500">Size</th>
+                      <th className="px-6 py-4 text-[13px] font-bold text-slate-500">Added On</th>
+                      <th className="px-6 py-4 text-[13px] font-bold text-slate-500">Status</th>
+                      <th className="px-6 py-4"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                  {sortedDocs.map((doc, idx) => {
+                    const isPdf = doc.originalName?.toLowerCase().endsWith('.pdf');
+                    const ext = doc.originalName?.split('.').pop()?.toUpperCase() || 'FILE';
+                    const folder = folders.find(f => f._id === doc.folderId || f._id === doc.folder);
+                    const isReady = doc.status === 'ready';
+
+                    return (
+                    <tr key={idx} onClick={() => setPreviewDoc(doc)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${previewDoc?._id === doc._id ? 'bg-indigo-50/50' : ''}`}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {isPdf ? (
+                            <img src="/pdf.svg.webp" alt="PDF" className="w-8 h-8 object-contain" />
+                          ) : (
+                            <img src="/Doc%20File.png" alt="Doc" className="w-8 h-8 object-contain" />
+                          )}
+                          <div>
+                            <div className="font-bold text-[14px] text-slate-800">{doc.title}</div>
+                            
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-[14px] text-slate-600 font-medium">{ext}</td>
+                      <td className="px-6 py-4 text-[14px] text-slate-600 font-medium">{formatSize(doc.size)}</td>
+                      <td className="px-6 py-4">
+                        <div className="text-[13px] text-slate-800 font-medium leading-tight whitespace-pre-line">{new Date(doc.createdAt).toLocaleDateString()}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isReady ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-bold">
+                            Ready
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Processing
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="p-2 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors" onClick={(e) => { e.stopPropagation(); }}>
+                            <MoreVertical className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameState({ id: doc._id, name: doc.title, type: 'document', open: true }); }}>
+                               <Edit2 className="h-4 w-4 mr-2" /> Rename
+                             </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem className="text-red-600 focus:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc._id); }}>
+                               <Trash className="h-4 w-4 mr-2" /> Delete
+                             </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+              </div>
+              
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+                <span className="text-[13px] font-medium text-slate-500">Showing {sortedDocs.length} documents</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sortedDocs.map((doc, idx) => {
+                  const isPdf = doc.originalName?.toLowerCase().endsWith('.pdf');
+                  const ext = doc.originalName?.split('.').pop()?.toUpperCase() || 'FILE';
+                  const folder = folders.find(f => f._id === doc.folderId || f._id === doc.folder);
+                  const isReady = doc.status === 'ready';
+
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => setPreviewDoc(doc)} 
+                      className={`relative flex flex-col bg-white border rounded-[20px] shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all group ${previewDoc?._id === doc._id ? 'border-indigo-500 ring-1 ring-indigo-500/20' : 'border-slate-200 hover:border-indigo-100'}`}
+                    >
+                      <div className="absolute top-3 right-3 z-10">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="p-2 bg-white/80 backdrop-blur-sm shadow-sm text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); }}>
+                            <MoreVertical className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameState({ id: doc._id, name: doc.title, type: 'document', open: true }); }}>
+                               <Edit2 className="h-4 w-4 mr-2" /> Rename
+                             </DropdownMenuItem>
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem className="text-red-600 focus:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc._id); }}>
+                               <Trash className="h-4 w-4 mr-2" /> Delete
+                             </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      
+                      <div className="h-32 bg-slate-50 flex items-center justify-center border-b border-slate-100">
+                        {isPdf ? (
+                          <img src="/pdf.svg.webp" alt="PDF" className="w-16 h-16 object-contain" />
+                        ) : (
+                          <img src="/Doc%20File.png" alt="Doc" className="w-16 h-16 object-contain" />
+                        )}
+                      </div>
+                      <div className="p-4 flex flex-col flex-1">
+                        <div className="font-bold text-[15px] text-slate-800 mb-1 truncate pr-8">{doc.title}</div>
+                        <div className="flex items-center gap-2 mb-3">
+                          {isReady ? (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                          )}
+                        </div>
+                        
+                        
+                        
+                        <div className="mt-auto flex items-center justify-between text-[12px] font-medium text-slate-400">
+                          <span>{ext} • {formatSize(doc.size)}</span>
+                          <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 px-2">
+                <span className="text-[13px] font-medium text-slate-500">Showing {sortedDocs.length} documents</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Sidebar Preview */}
+      <AnimatePresence>
+        {previewDoc && (
+          <motion.div 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: "100%", maxWidth: "400px", opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="border-l border-slate-200 bg-white flex flex-col h-full shadow-[-4px_0_24px_rgba(0,0,0,0.02)] overflow-hidden shrink-0 absolute md:relative right-0 top-0 bottom-0 z-20"
+          >
+            <div className="p-6 pb-0 overflow-y-auto flex-1 hide-scrollbar w-full md:w-[400px]">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="font-bold text-[20px] text-slate-900 leading-tight pr-4">{previewDoc.title}</h3>
+                <button onClick={() => setPreviewDoc(null)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-800 rounded-lg shrink-0 mt-[-4px] transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-3 text-[13px] text-slate-500 font-medium mb-6">
+                {previewDoc.originalName?.toLowerCase().endsWith('.pdf') ? (
+                  <img src="/pdf.svg.webp" alt="PDF" className="w-4 h-4 object-contain" />
+                ) : (
+                  <img src="/Doc%20File.png" alt="Doc" className="w-4 h-4 object-contain" />
+                )}
+                <span>{previewDoc.originalName?.split('.').pop()?.toUpperCase() || 'FILE'}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span>{formatSize(previewDoc.size)}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <span>Added on {new Date(previewDoc.createdAt).toLocaleDateString()}</span>
+              </div>
+              
+
+              <div className="mb-8">
+                <h4 className="text-sm font-bold text-slate-900 mb-4">Document Info</h4>
+                <div className="flex flex-col gap-4 text-[13px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Notes created</span>
+                    {loadingPreviewInfo ? (
+                      <span className="text-slate-400"><Loader2 className="w-3 h-3 animate-spin" /></span>
+                    ) : (
+                      <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded-md">{previewDocInfo?.notesCount || 0}</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Last modified</span>
+                    <span className="font-semibold text-slate-700">{new Date(previewDoc.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-8">
+                <h4 className="text-sm font-bold text-slate-900 mb-4">AI Summary</h4>
+                <div className="bg-slate-50 p-4 rounded-xl text-slate-700 text-sm leading-relaxed border border-slate-100">
+                  {loadingPreviewInfo ? (
+                    <div className="flex items-center justify-center py-4">
+                       <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                    </div>
+                  ) : (
+                    previewDocInfo?.summary || "No summary available."
+                  )}
+                </div>
+              </div>
+              
+              <div className="mb-8">
+                <h4 className="text-sm font-bold text-slate-900 mb-4">Actions</h4>
+                <div className="flex justify-between gap-2">
+                   <button onClick={() => setRenameState({ id: previewDoc._id, name: previewDoc.title, type: 'document', open: true })} className="flex-1 flex flex-col items-center justify-center gap-2 p-3 rounded-[16px] border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors">
+                     <Edit2 className="w-5 h-5 text-slate-600" />
+                     <span className="text-[11px] font-bold text-slate-700">Rename</span>
+                   </button>
+                   <button onClick={() => handleDeleteDocument(previewDoc._id)} className="flex-1 flex flex-col items-center justify-center gap-2 p-3 rounded-[16px] border border-red-100 bg-red-50 hover:bg-red-100 transition-colors">
+                     <Trash className="w-5 h-5 text-red-500" />
+                     <span className="text-[11px] font-bold text-red-600">Delete</span>
+                   </button>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-1">Documents</h1>
-          <p className="text-muted-foreground text-sm">Organize and manage your knowledge base.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" className="flex-1 sm:flex-none gap-2 rounded-xl h-10" onClick={() => setCreateFolderOpen(true)}>
-            <Folder className="h-4 w-4 text-indigo-500" />
-            New Folder
-          </Button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            className="hidden" 
-            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
-            multiple
-          />
-          <Button className="flex-1 sm:flex-none gap-2 rounded-xl h-10 bg-foreground hover:bg-foreground/90 text-background" onClick={() => fileInputRef.current?.click()}>
-            <Plus className="h-4 w-4" />
-            Upload File
-          </Button>
-        </div>
-      </div>
+      
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-card p-2 rounded-2xl border shadow-sm">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search documents..." 
-            className="pl-9 bg-transparent border-none shadow-none focus-visible:ring-0 h-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="hidden sm:block w-px h-6 bg-border mx-2" />
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-xl w-full sm:w-auto shrink-0">
-          <button 
-            onClick={() => setViewMode('grid')}
-            className={`flex-1 sm:flex-none p-1.5 rounded-lg flex justify-center transition-colors ${viewMode === 'grid' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-          <button 
-            onClick={() => setViewMode('list')}
-            className={`flex-1 sm:flex-none p-1.5 rounded-lg flex justify-center transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            <List className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      
 
-      {uploadingFiles.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {uploadingFiles.map((file, i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-card/50 shadow-sm">
-              <div className="flex items-center gap-3 truncate">
-                 <FileText className="h-4 w-4 text-primary shrink-0" />
-                 <span className="text-sm font-medium truncate">{file.name}</span>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                 <span className="text-xs text-muted-foreground">{file.progress}%</span>
-                 <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                   <div className="h-full bg-primary transition-all duration-300" style={{ width: `${file.progress}%` }} />
-                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {currentFolder ? (
-        <div className="flex items-center gap-2 mb-2">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentFolder(null)} className="gap-1 hover:bg-muted/50 rounded-xl">
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            {renderFolderIcon(currentFolder.folderType, "h-4 w-4 text-indigo-500 fill-indigo-500/20")}
-            {currentFolder.name}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Folders</h2>
-          {loading ? (
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                <FolderSkeleton />
-                <FolderSkeleton />
-                <FolderSkeleton />
-             </div>
-          ) : folders.length === 0 ? (
-            <div className="text-muted-foreground text-sm py-4 pl-1">No folders yet.</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {folders.map(f => (
-                <motion.div 
-                  whileHover={{ y: -2 }}
-                  key={f._id} 
-                  className="flex items-center justify-between p-3.5 rounded-2xl border bg-card hover:shadow-md cursor-pointer transition-all group"
-                  onClick={() => setCurrentFolder(f)}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {renderFolderIcon(f.folderType, `h-8 w-8 ${getColorClasses(f.color).text} ${getColorClasses(f.color).fill} group-hover:scale-110 transition-transform shrink-0`)}
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{f.name}</span>
-                      <span className="text-[11px] text-muted-foreground">{f.files} files</span>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger 
-                      onClick={(e) => e.stopPropagation()} 
-                      render={
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      } 
-                    />
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="rounded-xl">
-                      <DropdownMenuItem className="gap-2 rounded-lg" onClick={() => { handleRenameFolder(f._id, f.name); }}>
-                        <Edit2 className="h-4 w-4" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500 rounded-lg" onClick={() => { setItemToDelete({ id: f._id, type: 'folder' }); }}>
-                        <Trash className="h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-4 mt-2">
-        <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">
-          {currentFolder ? 'Folder Documents' : 'All Documents'}
-        </h2>
-        
-        {loading ? (
-          viewMode === 'grid' ? (
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <DocumentCardSkeleton />
-                <DocumentCardSkeleton />
-                <DocumentCardSkeleton />
-                <DocumentCardSkeleton />
-             </div>
-          ) : (
-             <DataTableSkeleton />
-          )
-        ) : filteredDocs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-muted/20 text-center">
-             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-               <FileText className="h-6 w-6 text-primary" />
-             </div>
-             <h3 className="text-lg font-semibold mb-1">No documents found</h3>
-             <p className="text-sm text-muted-foreground mb-4">Upload some files to get started.</p>
-             <Button variant="outline" className="rounded-xl" onClick={() => fileInputRef.current?.click()}>
-               Upload Document
-             </Button>
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredDocs.map((doc) => (
-              <motion.div 
-                whileHover={{ y: -2 }}
-                key={doc._id} 
-                className="flex flex-col rounded-2xl border bg-card p-4 hover:shadow-md transition-all group cursor-pointer"
-                onClick={() => setPreviewDoc(doc)}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white font-bold text-[10px] tracking-wider shadow-sm
-                    ${doc.type === 'pdf' ? 'bg-red-500' : doc.type === 'txt' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                    {doc.type === 'pdf' ? 'PDF' : doc.type === 'txt' ? 'TXT' : 'DOC'}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} render={
-                      <button className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors opacity-0 group-hover:opacity-100">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                    } />
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="rounded-xl">
-                      <DropdownMenuItem className="gap-2 rounded-lg" render={
-                        <a href={doc.url} download={doc.originalName} target="_blank" rel="noopener noreferrer" className="flex w-full items-center gap-2">
-                          <Download className="h-4 w-4" /> Download
-                        </a>
-                      } />
-                      <DropdownMenuItem className="gap-2 rounded-lg" onClick={() => { handleRenameDocument(doc._id, doc.title); }}>
-                        <Edit2 className="h-4 w-4" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 rounded-lg" onClick={() => { setMoveDocState({ id: doc._id, open: true }); }}>
-                        <Folder className="h-4 w-4" /> Move
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500 rounded-lg" onClick={() => { setItemToDelete({ id: doc._id, type: 'document' }); }}>
-                        <Trash className="h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                
-                <h3 className="font-semibold text-sm line-clamp-2 leading-tight mb-2 group-hover:text-primary transition-colors flex-1">
-                  {doc.title}
-                </h3>
-                
-                <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
-                  <div className="flex items-center gap-1 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full font-medium">
-                    <CheckCircle2 className="h-3 w-3" /> Ready
-                  </div>
-                  <span>{formatSize(doc.size)}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left whitespace-nowrap">
-                <thead className="bg-muted/50 text-muted-foreground border-b text-[11px] uppercase font-semibold tracking-wider">
-                <tr>
-                  <th className="px-6 py-4">Name</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Size</th>
-                  <th className="px-6 py-4">Date Added</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredDocs.map((doc) => (
-                  <tr key={doc._id} className="hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setPreviewDoc(doc)}>
-                    <td className="px-6 py-4 font-medium flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-[8px] tracking-wider shrink-0
-                        ${doc.type === 'pdf' ? 'bg-red-500' : doc.type === 'txt' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                        {doc.type === 'pdf' ? 'PDF' : doc.type === 'txt' ? 'TXT' : 'DOC'}
-                      </div>
-                      <span className="hover:underline group-hover:text-primary truncate max-w-[200px] sm:max-w-xs transition-colors">
-                        {doc.title}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-medium">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Ready
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground text-xs">{formatSize(doc.size)}</td>
-                    <td className="px-6 py-4 text-muted-foreground text-xs">{new Date(doc.createdAt).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} render={
-                          <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        } />
-                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="rounded-xl">
-                          <DropdownMenuItem className="gap-2 rounded-lg" render={
-                            <a href={doc.url} download={doc.originalName} target="_blank" rel="noopener noreferrer" className="flex w-full items-center gap-2">
-                              <Download className="h-4 w-4" /> Download
-                            </a>
-                          } />
-                          <DropdownMenuItem className="gap-2 rounded-lg" onClick={() => { handleRenameDocument(doc._id, doc.title); }}>
-                            <Edit2 className="h-4 w-4" /> Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 rounded-lg" onClick={() => { setMoveDocState({ id: doc._id, open: true }); }}>
-                            <Folder className="h-4 w-4" /> Move
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-500 gap-2 focus:text-red-500 rounded-lg" onClick={() => { setItemToDelete({ id: doc._id, type: 'document' }); }}>
-                            <Trash className="h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-md rounded-3xl p-0 overflow-hidden border-0">
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-8 text-white flex flex-col items-center justify-center relative overflow-hidden">
-             <div className="absolute inset-0 bg-white/10 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-             <div className={`h-20 w-20 rounded-2xl flex items-center justify-center text-white font-bold text-xl tracking-wider shadow-xl z-10 mb-4 border border-white/20
-                ${previewDoc?.type === 'pdf' ? 'bg-red-500' : previewDoc?.type === 'txt' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                {previewDoc?.type === 'pdf' ? 'PDF' : previewDoc?.type === 'txt' ? 'TXT' : 'DOC'}
-             </div>
-             <h3 className="font-bold text-xl truncate w-full text-center z-10">{previewDoc?.title}</h3>
-             <p className="text-white/80 mt-2 text-sm z-10 flex items-center gap-2">
-               {formatSize(previewDoc?.size)} <span className="w-1 h-1 rounded-full bg-white/50" /> {new Date(previewDoc?.createdAt || Date.now()).toLocaleDateString()}
-             </p>
-          </div>
-          <div className="p-6 bg-card flex flex-col gap-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <button className="flex flex-col items-center justify-center gap-2 p-3 sm:p-4 rounded-2xl border bg-background hover:bg-muted transition-colors">
-                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                   <Download className="h-5 w-5 text-primary" />
-                 </div>
-                 <span className="text-sm font-medium text-foreground">Download</span>
-               </button>
-               <button className="flex flex-col items-center justify-center gap-2 p-3 sm:p-4 rounded-2xl border bg-background hover:bg-muted transition-colors">
-                 <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                   <ExternalLink className="h-5 w-5 text-indigo-500" />
-                 </div>
-                 <span className="text-sm font-medium text-foreground">View Original</span>
-               </button>
-            </div>
-            
-            <div className="bg-muted/50 rounded-2xl p-4 flex flex-col gap-3">
-               <div className="flex items-center justify-between">
-                 <span className="text-sm font-medium">AI Status</span>
-                 <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full text-xs font-medium">
-                   <CheckCircle2 className="h-3.5 w-3.5" /> Ready for Analysis
-                 </div>
-               </div>
-               <div className="text-xs text-muted-foreground leading-relaxed">
-                 This document has been processed and is ready to be used in AI Chat, Quizzes, and Flashcards.
-               </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    
-      <ConfirmDialog 
-        open={!!itemToDelete}
-        onOpenChange={(open) => !open && setItemToDelete(null)}
-        title={itemToDelete?.type === 'document' ? "Delete Document" : "Delete Folder"}
-        description={itemToDelete?.type === 'document' 
-          ? "Are you sure you want to delete this document? This action cannot be undone."
-          : "Are you sure you want to delete this folder? Any documents inside will be moved to the root level. This action cannot be undone."
-        }
-        confirmText="Delete"
-        destructive={true}
-        onConfirm={() => {
-          if (itemToDelete?.type === 'document') {
-            handleDeleteDocument(itemToDelete.id);
-          } else if (itemToDelete?.type === 'folder') {
-            handleDeleteFolder(itemToDelete.id);
-          }
-          setItemToDelete(null);
-        }}
-      />
-
-      <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+      <Dialog open={renameState.open} onOpenChange={(open) => setRenameState({ ...renameState, open })}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Folder</DialogTitle>
+            <DialogTitle>Rename {renameState.type === 'folder' ? 'Folder' : 'Document'}</DialogTitle>
             <DialogDescription>
-              Enter a name for your new folder to organize documents.
+              Enter a new name for this {renameState.type}.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="e.g. History Notes"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCreateFolder();
-                }
-              }}
-              autoFocus
-              className="rounded-xl h-12 mb-4"
-            />
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Subject Color</span>
-              <div className="flex gap-2">
-                {folderColors.map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => setNewFolderColor(c.value)}
-                    className={`h-8 w-8 rounded-full ${c.class} transition-all ${newFolderColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'opacity-70 hover:opacity-100'}`}
-                    title={c.name}
-                  />
-                ))}
-              </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="rename" className="text-sm font-medium text-slate-700">New Name</label>
+              <Input
+                id="rename"
+                value={renameState.name}
+                onChange={(e) => setRenameState({ ...renameState, name: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleRenameSubmit();
+                  }
+                }}
+                className="col-span-3 rounded-xl"
+                autoFocus
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setCreateFolderOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl" onClick={handleCreateFolder}>Create Folder</Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => setRenameState({ ...renameState, open: false })}>Cancel</Button>
+            <Button className="rounded-xl bg-slate-900 text-white" onClick={handleRenameSubmit}>Save Changes</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={moveDocState.open} onOpenChange={(open) => setMoveDocState({ ...moveDocState, open })}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Move Document</DialogTitle>
-            <DialogDescription>
-              Select a destination folder for this document.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 flex flex-col gap-1 max-h-[50vh] overflow-y-auto">
-            <div 
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
-              onClick={() => {
-                handleMoveDocument(moveDocState.id, 'root');
-                setMoveDocState({ id: "", open: false });
-              }}
-            >
-              <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Folder className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <span className="font-medium text-sm">Root Directory</span>
-            </div>
-            {folders.map(f => (
-              <div 
-                key={f._id} 
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
-                onClick={() => {
-                  handleMoveDocument(moveDocState.id, f._id);
-                  setMoveDocState({ id: "", open: false });
-                }}
-              >
-                <div className={`h-8 w-8 rounded-lg ${getColorClasses(f.color).bg} flex items-center justify-center shrink-0`}>
-                  {renderFolderIcon(f.folderType, `h-4 w-4 ${getColorClasses(f.color).text} ${getColorClasses(f.color).fill}`)}
-                </div>
-                <span className="font-medium text-sm">{f.name}</span>
-              </div>
-            ))}
-          </div>
         </DialogContent>
       </Dialog>
     </div>

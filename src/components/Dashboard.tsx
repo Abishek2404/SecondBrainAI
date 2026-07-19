@@ -351,9 +351,9 @@ export function Dashboard() {
                   {documents.slice(0, 3).map((doc, i) => (
                     <div key={i} className="flex flex-col p-4 rounded-[20px] bg-card border shadow-sm group hover:shadow-md transition-all cursor-pointer justify-between gap-4" onClick={() => navigate('/documents')}>
                        <div className="flex items-start gap-4 min-w-0">
-                          <div className="h-10 w-10 shrink-0 rounded-[14px] bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 flex items-center justify-center text-red-500 font-bold text-[10px] tracking-wider">
-                            {doc.type === 'pdf' || doc.mimeType?.includes('pdf') ? 'PDF' : doc.type === 'txt' || doc.mimeType?.includes('text') ? 'TXT' : 'DOC'}
-                          </div>
+                          <div className="h-10 w-10 shrink-0 flex items-center justify-center">
+                             <img src={doc.type === 'pdf' || doc.mimeType?.includes('pdf') ? '/pdf.svg.webp' : '/Doc%20File.png'} alt="Icon" className="h-full w-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
+                           </div>
                           <div className="flex flex-col min-w-0 flex-1">
                              <h4 className="font-semibold text-sm truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{doc.title}</h4>
                              <span className="text-[11px] text-muted-foreground mt-0.5">Updated {new Date(doc.createdAt).toLocaleDateString()}</span>
