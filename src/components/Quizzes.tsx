@@ -240,11 +240,6 @@ export function Quizzes() {
             <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-xl relative
                ${isSuccess ? 'bg-emerald-500' : 'bg-orange-500'}`}>
                <Trophy className="h-10 w-10 text-white" />
-               <div className="absolute -bottom-2 -right-2 bg-background p-1.5 rounded-full shadow-sm">
-                 <div className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-bold border border-primary/20">
-                   +{quizResult.xp} XP
-                 </div>
-               </div>
             </div>
             
             <h1 className="text-4xl font-bold mb-2 tracking-tight">
@@ -665,16 +660,6 @@ export function Quizzes() {
               );
             })
           )}
-          
-          <div className="flex justify-between items-center mt-4">
-             <span className="text-sm font-semibold text-muted-foreground">Showing 1 to {Math.min(8, filteredQuizzes.length)} of {quizzes.length} quizzes</span>
-             <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/50 text-muted-foreground hover:bg-muted"><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="default" className="h-8 w-8 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-0 font-bold shadow-sm">1</Button>
-                <Button variant="ghost" className="h-8 w-8 rounded-lg px-0 font-bold text-muted-foreground">2</Button>
-                <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-border/50 text-muted-foreground hover:bg-muted"><ChevronRight className="h-4 w-4" /></Button>
-             </div>
-          </div>
         </div>
       </div>
 

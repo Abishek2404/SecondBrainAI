@@ -12,7 +12,6 @@ const navigation = [
   { name: "Quizzes", href: "/quizzes", icon: BrainCircuit },
   { name: "Flashcards", href: "/flashcards", icon: Layers },
   { name: "Planner", href: "/planner", icon: Calendar },
-  { name: "Analytics", href: "/analytics", icon: BarChart2 },
 ];
 
 export interface SidebarProps {

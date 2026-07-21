@@ -116,10 +116,7 @@ export function Dashboard() {
 
   const currentStreakVal = user?.currentStreak !== undefined ? user.currentStreak : (analytics?.studyStreak || 0);
   const longestStreakVal = user?.longestStreak !== undefined ? user.longestStreak : (analytics?.studyStreak || 0);
-  const xp = user?.xp !== undefined ? user.xp : (analytics?.xp ?? 0);
-  const level = user?.level !== undefined ? user.level : (analytics?.level ?? 1);
-  const coins = user?.coins !== undefined ? user.coins : (analytics?.coins ?? 0);
-  
+
   const completedTasks = analytics?.todayCompletedTasks ?? 0;
   const goalProgressPct = Math.min(100, Math.round((completedTasks / (dailyTasksGoal || 4)) * 100));
 
@@ -621,7 +618,6 @@ export function Dashboard() {
          <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
                <h3 className="font-semibold text-[16px] tracking-tight">Recent Activity</h3>
-               <Link to="/analytics" className="text-sm text-indigo-600 dark:text-indigo-400 font-medium hover:underline">View all</Link>
             </div>
             <div className="bg-card border rounded-[20px] p-2 shadow-sm flex flex-col">
                {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (

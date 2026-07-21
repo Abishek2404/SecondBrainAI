@@ -8,7 +8,13 @@ import sendEmail from '../utils/sendEmail';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+let googleClient: OAuth2Client | null = null;
+function getGoogleClient() {
+  if (!googleClient) {
+    googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+  return googleClient;
+}
 
 // Helper function to get token from model, create cookie and send response
 const sendTokenResponse = (user: any, statusCode: number, res: Response) => {

@@ -13,7 +13,7 @@ import { errorHandler } from "./src/server/middlewares/error";
 import { protect } from "./src/server/middlewares/auth";
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ override: true });
 
 async function startServer() {
   // Connect to MongoDB

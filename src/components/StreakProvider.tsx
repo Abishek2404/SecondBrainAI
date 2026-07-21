@@ -315,10 +315,9 @@ export const StreakProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               </p>
 
               {/* Rewards Grid */}
-              <div className="w-full bg-muted/40 rounded-2xl p-4 grid grid-cols-4 gap-2 mb-6">
+              <div className="w-full bg-muted/40 rounded-2xl p-4 grid grid-cols-3 gap-2 mb-6">
                 {[
                   { label: 'Streak', value: `+${reward?.streak || 1}`, icon: Flame, color: 'text-orange-500 bg-orange-500/10' },
-                  { label: 'XP', value: `+${reward?.xp || 20}`, icon: Trophy, color: 'text-amber-500 bg-amber-500/10' },
                   { label: 'Coins', value: `+${reward?.coins || 10}`, icon: Sparkles, color: 'text-yellow-500 bg-yellow-500/10' },
                   { label: 'Focus', value: `+${reward?.focus || 5}`, icon: Zap, color: 'text-primary bg-primary/10' },
                 ].map((item, idx) => (

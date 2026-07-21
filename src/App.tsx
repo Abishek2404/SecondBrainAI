@@ -12,7 +12,6 @@ import { Documents } from "./components/Documents";
 import { SmartNotes } from "./components/SmartNotes";
 import { StudyPlanner } from "./components/StudyPlanner";
 import { Flashcards } from "./components/Flashcards";
-import { Analytics } from "./components/Analytics";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth } from "./components/AuthProvider";
@@ -81,7 +80,6 @@ export default function App() {
                     <Route path="quizzes" element={<Quizzes />} />
                     <Route path="planner" element={<StudyPlanner />} />
                     <Route path="flashcards" element={<Flashcards />} />
-                    <Route path="analytics" element={<Analytics />} />
                     <Route path="profile" element={<Profile />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
