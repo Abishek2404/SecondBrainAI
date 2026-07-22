@@ -1,28 +1,140 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/components/Documents.tsx', 'utf8');
+let code = fs.readFileSync('src/server/services/rag.service.ts', 'utf8');
+code = code.replace(
+  /export async function generateAnswer[\s\S]*?export async function generateContentWithRetry/m,
+`import path from 'path';
+import fsObj from 'fs';
 
-const oldContent = `              className="rounded-xl h-12"
-            />
-          </div>
-          <DialogFooter>`;
+export async function generateAnswer(query: string, history: any[], contextChunks: string[], imageUrl?: string): Promise<string> {
+  const ai = getAI();
+  
+  const contextText = contextChunks.length > 0 
+    ? \`Use the following context to answer the user's question. If the answer is not in the context, use your own knowledge or search grounding.\\n\\nContext:\\n\${contextChunks.join('\\n\\n---\\n\\n')}\`
+    : \`You are a helpful study assistant.\`;
+    
+  const systemInstruction = contextText;
 
-const newContent = `              className="rounded-xl h-12 mb-4"
-            />
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Subject Color</span>
-              <div className="flex gap-2">
-                {folderColors.map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => setNewFolderColor(c.value)}
-                    className={\`h-8 w-8 rounded-full \${c.class} transition-all \${newFolderColor === c.value ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'opacity-70 hover:opacity-100'}\`}
-                    title={c.name}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>`;
+  // Determine model based on inputs
+  let modelToUse = 'gemini-3.5-flash';
+  let config: any = { systemInstruction };
+  
+  if (imageUrl) {
+    modelToUse = 'gemini-3.1-pro-preview'; // Image analysis is a complex task
+  } else if (query.toLowerCase().includes('search') || query.toLowerCase().includes('latest') || query.toLowerCase().includes('current')) {
+    modelToUse = 'gemini-3.5-flash';
+    config.tools = [{ googleSearch: {} }];
+  } else if (query.length < 50 && contextChunks.length === 0) {
+    modelToUse = 'gemini-3.1-flash-lite'; // Fast simple task
+  } else if (query.length > 500) {
+    modelToUse = 'gemini-3.1-pro-preview'; // Complex
+  }
 
-code = code.replace(oldContent, newContent);
-fs.writeFileSync('src/components/Documents.tsx', code);
+  const contents = [];
+  
+  for (const msg of history) {
+    const parts: any[] = [{ text: msg.content }];
+    if (msg.image) {
+       // Convert local file to inlineData
+       try {
+         const imagePath = path.join(process.cwd(), msg.image);
+         if (fsObj.existsSync(imagePath)) {
+            const data = fsObj.readFileSync(imagePath).toString('base64');
+            const mimeType = msg.image.endsWith('.png') ? 'image/png' : (msg.image.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+            parts.push({ inlineData: { data, mimeType } });
+         }
+       } catch(e) {}
+    }
+    contents.push({
+      role: msg.role === 'model' ? 'model' : 'user',
+      parts
+    });
+  }
+  
+  const userParts: any[] = [{ text: query }];
+  if (imageUrl) {
+    try {
+      const imagePath = path.join(process.cwd(), imageUrl);
+      if (fsObj.existsSync(imagePath)) {
+        const data = fsObj.readFileSync(imagePath).toString('base64');
+        const mimeType = imageUrl.endsWith('.png') ? 'image/png' : (imageUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+        userParts.push({ inlineData: { data, mimeType } });
+      }
+    } catch(e) {}
+  }
+  
+  contents.push({
+    role: 'user',
+    parts: userParts
+  });
+
+  let retries = 3;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelToUse,
+        contents: contents,
+        config
+      });
+      return response.text || "I'm sorry, I couldn't generate a response.";
+    } catch (error: any) {
+      const errorStr = String(error);
+      if (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+        console.warn(\`\${modelToUse} quota error, falling back...\`);
+        try {
+          const fallbackResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: { systemInstruction }
+          });
+          return fallbackResponse.text || "I'm sorry, I couldn't generate a response.";
+        } catch (fallbackError) {
+          if (attempt === retries - 1) throw fallbackError;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      } else if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
+        if (attempt === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } else {
+        if (attempt === retries - 1) throw error;
+      }
+    }
+  }
+  return "I'm sorry, I couldn't generate a response.";
+}
+
+export async function generateContentWithRetry`
+);
+fs.writeFileSync('src/server/services/rag.service.ts', code);
+
+let code2 = fs.readFileSync('src/server/controllers/chat.controller.ts', 'utf8');
+
+code2 = code2.replace(
+  /const { text, conversationId, documentId } = req.body;/g,
+  'const { text, conversationId, documentId, imageUrl } = req.body;'
+);
+
+code2 = code2.replace(
+  /conversation\.messages\.push\({[\s\S]*?role: 'user',[\s\S]*?content: text,[\s\S]*?createdAt: new Date\(\),[\s\S]*?}\);/m,
+  `conversation.messages.push({
+      role: 'user',
+      content: text,
+      image: imageUrl,
+      createdAt: new Date(),
+    });`
+);
+
+code2 = code2.replace(
+  /const history = conversation\.messages\.slice\(0, -1\)\.map\(\(m: any\) => \(\{[\s\S]*?role: m\.role,[\s\S]*?content: m\.content[\s\S]*?\}\)\);/m,
+  `const history = conversation.messages.slice(0, -1).map((m: any) => ({
+      role: m.role,
+      content: m.content,
+      image: m.image
+    }));`
+);
+
+code2 = code2.replace(
+  /const answer = await generateAnswer\(text, history, contextChunks\);/g,
+  'const answer = await generateAnswer(text, history, contextChunks, imageUrl);'
+);
+
+fs.writeFileSync('src/server/controllers/chat.controller.ts', code2);

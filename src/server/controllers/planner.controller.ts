@@ -83,7 +83,7 @@ export const generateSchedule = async (req: Request, res: Response, next: NextFu
 
     const genAI = getAI();
     const response = await generateContentWithRetry({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 

@@ -42,7 +42,7 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
 // @route   POST /api/chat
 export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { text, conversationId, documentId } = req.body;
+    const { text, conversationId, documentId, imageUrl } = req.body;
     
     if (!text) {
       return next(new AppError('Please provide a message', 400));
@@ -69,6 +69,7 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
     conversation.messages.push({
       role: 'user',
       content: text,
+      image: imageUrl,
       createdAt: new Date(),
     });
 
@@ -78,7 +79,8 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
     // 1. Get history
     const history = conversation.messages.slice(0, -1).map((m: any) => ({
       role: m.role,
-      content: m.content
+      content: m.content,
+      image: m.image
     }));
 
     // 2. Search relevant context
@@ -87,7 +89,7 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
     const contextChunks = await semanticSearch(text, req.user?._id.toString(), targetDocId);
 
     // 3. Generate answer
-    const answer = await generateAnswer(text, history, contextChunks);
+    const answer = await generateAnswer(text, history, contextChunks, imageUrl);
 
     // Add model message
     conversation.messages.push({

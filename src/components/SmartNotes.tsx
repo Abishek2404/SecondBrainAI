@@ -324,30 +324,7 @@ export function SmartNotes() {
             </div>
             
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto flex-1">
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="summary">Summary</SelectItem>
-                  <SelectItem value="important question">Important Questions</SelectItem>
-                  <SelectItem value="cheat sheet">Cheat Sheets</SelectItem>
-                  <SelectItem value="mind map">Mind Maps</SelectItem>
-                </SelectContent>
-              </Select>
               
-              <Select value={filterSubject} onValueChange={setFilterSubject}>
-                <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">
-                  <SelectValue placeholder="All Subjects" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="all">All Subjects</SelectItem>
-                  {uniqueSubjects.map((sub: string) => (
-                    <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-[140px] h-11 rounded-xl bg-card border shadow-sm font-medium focus:ring-indigo-500">

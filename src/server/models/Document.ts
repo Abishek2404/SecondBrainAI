@@ -12,6 +12,7 @@ export interface IDocument extends MongooseDocument {
   status: 'processing' | 'ready' | 'failed';
   summary?: string;
   subject?: string;
+  tags?: string[];
 }
 
 const DocumentSchema: Schema<IDocument> = new Schema(
@@ -59,6 +60,10 @@ const DocumentSchema: Schema<IDocument> = new Schema(
     },
     subject: {
       type: String,
+    },
+    tags: {
+      type: [String],
+      default: [],
     },
   },
   {

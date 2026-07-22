@@ -273,7 +273,11 @@ export function StudyPlanner() {
                               <Clock className="h-3.5 w-3.5" /> {task.duration}
                             </span>
                             <span className="w-1 h-1 rounded-full bg-border" />
-                            <span className="uppercase tracking-wider text-[10px]">{task.type}</span>
+                            <span className="uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                              {task.type === 'Reading' && <img src="/Reading.png" alt="Reading" className="w-3 h-3 object-contain" />}
+                              {task.type === 'Practice' && <img src="/Practise.png" alt="Practice" className="w-3 h-3 object-contain" />}
+                              {task.type}
+                            </span>
                           </div>
                         </div>
                         {task.status !== 'completed' && (

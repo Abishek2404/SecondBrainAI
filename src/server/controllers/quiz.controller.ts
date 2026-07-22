@@ -100,7 +100,7 @@ Document Content:\n${fullText}`;
 
     const genAI = getAI();
     const response = await generateContentWithRetry({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -213,7 +213,7 @@ Document Content:\n${fullText}`;
 
     const genAI = getAI();
     const response = await generateContentWithRetry({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 

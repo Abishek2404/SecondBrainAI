@@ -97,7 +97,13 @@ export function NotificationsPopover() {
                   <div className="flex flex-col gap-1 min-w-0">
                     <p className="text-sm font-medium leading-none truncate">{task.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {task.type} • {task.duration}
+                      
+                      <span className="flex items-center gap-1">
+                        {task.type === 'Reading' && <img src="/Reading.png" alt="Reading" className="w-3 h-3 object-contain" />}
+                        {task.type === 'Practice' && <img src="/Practise.png" alt="Practice" className="w-3 h-3 object-contain" />}
+                        {task.type} • {task.duration}
+                      </span>
+    
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Due: {new Date(task.date).toLocaleDateString()}

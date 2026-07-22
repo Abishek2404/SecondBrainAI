@@ -1,30 +1,15 @@
-import { DocumentChunk } from '../models/DocumentChunk';
+const fs = require('fs');
+
+const code = `import { DocumentChunk } from '../models/DocumentChunk';
+import { getAI } from '../ai';
+import { cosineSimilarity } from '../utils/math';
 import mongoose from 'mongoose';
 import path from 'path';
 import fsObj from 'fs';
-import { GoogleGenAI } from '@google/genai';
-
-const getAI = () => {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-};
-
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 
 // Chunk text into smaller pieces
 export function chunkText(text: string, maxChunkSize = 1000): string[] {
-  const cleanedText = text.replace(/\s+/g, ' ');
+  const cleanedText = text.replace(/\\s+/g, ' ');
   const sentences = cleanedText.match(/[^.!?]+[.!?]+/g) || [cleanedText];
   
   const chunks: string[] = [];
@@ -52,7 +37,7 @@ export async function generateEmbedding(text: string, retries = 3): Promise<numb
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const response = await ai.models.embedContent({
-        model: 'gemini-embedding-2',
+        model: 'text-embedding-004',
         contents: text,
       });
       return response.embeddings?.[0]?.values || [];
@@ -60,7 +45,7 @@ export async function generateEmbedding(text: string, retries = 3): Promise<numb
       if (attempt === retries - 1) throw error;
       const errorStr = String(error);
       if (errorStr.includes('429') || errorStr.includes('503') || errorStr.includes('RESOURCE_EXHAUSTED')) {
-        console.warn(`Rate limit hit, retrying attempt ${attempt + 1} in 5s...`);
+        console.warn(\`Rate limit hit, retrying attempt \${attempt + 1} in 5s...\`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       } else {
         throw error;
@@ -74,7 +59,7 @@ export async function generateEmbedding(text: string, retries = 3): Promise<numb
 export async function processDocument(documentId: string, userId: string, text: string) {
   const chunks = chunkText(text);
   
-  console.log(`Processing ${chunks.length} chunks for document ${documentId}`);
+  console.log(\`Processing \${chunks.length} chunks for document \${documentId}\`);
   
   for (let i = 0; i < chunks.length; i++) {
     const chunkText = chunks[i];
@@ -92,7 +77,7 @@ export async function processDocument(documentId: string, userId: string, text: 
       // Add delay to respect free tier rate limits
       await new Promise(resolve => setTimeout(resolve, 650));
     } catch (error) {
-      console.error(`Error generating embedding for chunk ${i}:`, error);
+      console.error(\`Error generating embedding for chunk \${i}:\`, error);
       throw error;
     }
   }
@@ -158,18 +143,18 @@ export async function generateAnswer(query: string, history: any[], contextChunk
   const ai = getAI();
   
   const contextText = contextChunks.length > 0 
-    ? `Use the following context to answer the user's question. If the answer is not in the context, use your own knowledge or search grounding.\n\nContext:\n${contextChunks.join('\n\n---\n\n')}`
-    : `You are a helpful study assistant.`;
+    ? \`Use the following context to answer the user's question. If the answer is not in the context, use your own knowledge or search grounding.\\n\\nContext:\\n\${contextChunks.join('\\n\\n---\\n\\n')}\`
+    : \`You are a helpful study assistant.\`;
     
   const systemInstruction = contextText;
 
-  let modelToUse = 'gemini-3.6-flash';
+  let modelToUse = 'gemini-3.5-flash';
   let config: any = { systemInstruction };
   
   if (imageUrl) {
     modelToUse = 'gemini-3.1-pro-preview';
   } else if (query.toLowerCase().includes('search') || query.toLowerCase().includes('latest') || query.toLowerCase().includes('current')) {
-    modelToUse = 'gemini-3.6-flash';
+    modelToUse = 'gemini-3.5-flash';
     config.tools = [{ googleSearch: {} }];
   } else if (query.length < 50 && contextChunks.length === 0) {
     modelToUse = 'gemini-3.1-flash-lite';
@@ -226,7 +211,7 @@ export async function generateAnswer(query: string, history: any[], contextChunk
     } catch (error: any) {
       const errorStr = String(error) + (error.message || '') + JSON.stringify(error, Object.getOwnPropertyNames(error));
       if (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
-        console.warn(`${modelToUse} rate limit or 503, retrying in 3 seconds...`);
+        console.warn(\`\${modelToUse} rate limit or 503, retrying in 3 seconds...\`);
         if (attempt === retries - 1) throw error;
         await new Promise(resolve => setTimeout(resolve, 3000));
       } else {
@@ -246,7 +231,7 @@ export async function generateContentWithRetry(params: any, retries = 3): Promis
     } catch (error: any) {
       const errorStr = String(error) + (error.message || '') + JSON.stringify(error, Object.getOwnPropertyNames(error));
       if (errorStr.includes('429') || errorStr.includes('quota') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
-        console.warn(`generateContent rate limit or 503, retrying in 3 seconds...`);
+        console.warn(\`generateContent rate limit or 503, retrying in 3 seconds...\`);
         if (attempt === retries - 1) throw error;
         await new Promise(resolve => setTimeout(resolve, 3000));
       } else {
@@ -255,3 +240,6 @@ export async function generateContentWithRetry(params: any, retries = 3): Promis
     }
   }
 }
+`;
+
+fs.writeFileSync('src/server/services/rag.service.ts', code);

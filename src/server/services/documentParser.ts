@@ -52,9 +52,9 @@ export const extractTextFromFile = async (filePath: string, mimeType: string, or
         });
         textResponse = response.text || "";
       } catch (err: any) {
-        console.warn("gemini-2.5-pro failed, falling back to gemini-2.5-flash", err.message);
+        console.warn("gemini-2.5-pro failed, falling back to gemini-3.6-flash", err.message);
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [
             {
               role: 'user',

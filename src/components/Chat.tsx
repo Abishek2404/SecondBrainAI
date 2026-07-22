@@ -22,6 +22,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   attachedFile?: string;
+  imageUrl?: string;
   citations?: any[];
 }
 
@@ -30,7 +31,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [attachedDoc, setAttachedDoc] = useState<{ id: string; name: string } | null>(null);
+  const [attachedDoc, setAttachedDoc] = useState<{ id: string; name: string; url?: string; isImage?: boolean } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -106,7 +107,13 @@ export function Chat() {
       });
       const data = await response.json();
       if (data.success) {
-        setAttachedDoc({ id: data.data._id, name: data.data.originalName || data.data.title });
+        const isImage = data.data.originalName.match(/\.(jpg|jpeg|png|webp)$/i);
+        setAttachedDoc({ 
+          id: data.data._id, 
+          name: data.data.originalName || data.data.title,
+          url: data.data.url,
+          isImage: !!isImage
+        });
         toast.success("File attached successfully");
       } else {
         toast.error(data.error || "Failed to upload file");
@@ -129,7 +136,8 @@ export function Chat() {
       id: Date.now().toString(), 
       role: "user", 
       content: userContent,
-      attachedFile: attachedDoc?.name
+      attachedFile: attachedDoc?.isImage ? undefined : attachedDoc?.name,
+      imageUrl: attachedDoc?.isImage ? attachedDoc?.url : undefined
     };
     
     setMessages(prev => [...prev, userMsg]);
@@ -145,7 +153,8 @@ export function Chat() {
         body: JSON.stringify({ 
           text: userContent, 
           conversationId,
-          documentId: docIdToSend
+          documentId: attachedDoc?.isImage ? undefined : docIdToSend,
+          imageUrl: attachedDoc?.isImage ? attachedDoc?.url : undefined
         })
       });
       const data = await response.json();
@@ -227,6 +236,11 @@ export function Chat() {
                           <span className="truncate">{msg.attachedFile}</span>
                         </div>
                       )}
+                      {msg.imageUrl && (
+                        <div className="mb-3">
+                          <img src={msg.imageUrl} alt="Attached" className="max-w-[200px] rounded-lg border shadow-sm" />
+                        </div>
+                      )}
                       <span className="font-medium">{msg.content}</span>
                       <div className="flex justify-end mt-1 items-center gap-1">
                          <span className="text-[10px] text-indigo-400 font-medium">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -294,9 +308,13 @@ export function Chat() {
             {attachedDoc && (
               <div className="mb-3 flex items-center justify-between p-2.5 rounded-xl border bg-background shadow-sm text-sm w-fit max-w-xs ml-4">
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <div className="p-1.5 bg-primary/10 rounded-lg">
-                    <FileText className="h-4 w-4 shrink-0 text-primary" />
-                  </div>
+                  {attachedDoc.isImage ? (
+                    <img src={attachedDoc.url} alt="Attached" className="h-8 w-8 rounded object-cover shrink-0" />
+                  ) : (
+                    <div className="p-1.5 bg-primary/10 rounded-lg">
+                      <FileText className="h-4 w-4 shrink-0 text-primary" />
+                    </div>
+                  )}
                   <span className="truncate font-medium">{attachedDoc.name}</span>
                 </div>
                 <button 

@@ -113,7 +113,7 @@ export const generateNote = async (req: Request, res: Response, next: NextFuncti
 
     const genAI = getAI();
     const response = await generateContentWithRetry({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
     

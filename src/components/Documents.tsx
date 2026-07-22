@@ -527,7 +527,13 @@ export function Documents() {
                           )}
                           <div>
                             <div className="font-bold text-[14px] text-slate-800">{doc.title}</div>
-                            
+                            {doc.tags && doc.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                    {doc.tags.slice(0, 3).map((tag: string, i: number) => (
+                                        <span key={i} className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md">{tag}</span>
+                                    ))}
+                                </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -622,7 +628,13 @@ export function Documents() {
                           )}
                         </div>
                         
-                        
+                        {doc.tags && doc.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                                {doc.tags.slice(0, 3).map((tag: string, i: number) => (
+                                    <span key={i} className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md">{tag}</span>
+                                ))}
+                            </div>
+                        )}
                         
                         <div className="mt-auto flex items-center justify-between text-[12px] font-medium text-slate-400">
                           <span>{ext} • {formatSize(doc.size)}</span>
@@ -690,6 +702,17 @@ export function Documents() {
                   </div>
                 </div>
               </div>
+              
+              {previewDoc.tags && previewDoc.tags.length > 0 && (
+                  <div className="mb-8">
+                      <h4 className="text-sm font-bold text-slate-900 mb-4">Tags</h4>
+                      <div className="flex flex-wrap gap-2">
+                          {previewDoc.tags.map((tag: string, i: number) => (
+                              <span key={i} className="text-xs font-semibold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{tag}</span>
+                          ))}
+                      </div>
+                  </div>
+              )}
               
               <div className="mb-8">
                 <h4 className="text-sm font-bold text-slate-900 mb-4">AI Summary</h4>

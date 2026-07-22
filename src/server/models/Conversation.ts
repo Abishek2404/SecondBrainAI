@@ -3,6 +3,7 @@ import mongoose, { Document as MongooseDocument, Schema } from 'mongoose';
 export interface IMessage {
   role: 'user' | 'model';
   content: string;
+  image?: string;
   createdAt: Date;
 }
 
@@ -33,6 +34,7 @@ const ConversationSchema: Schema<IConversation> = new Schema(
       {
         role: { type: String, enum: ['user', 'model'], required: true },
         content: { type: String, required: true },
+        image: { type: String },
         createdAt: { type: Date, default: Date.now },
       },
     ],

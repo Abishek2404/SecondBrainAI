@@ -117,13 +117,6 @@ export function AppLayout() {
             <div className="relative">
                 <NotificationsPopover />
             </div>
-            
-            <div className="hidden md:flex items-center gap-3 pl-2 border-l">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shrink-0 overflow-hidden ring-2 ring-background shadow-sm">
-                {user?.avatar ? <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" /> : getInitials(user?.name || 'User')}
-              </div>
-              <span className="text-sm font-semibold">{user?.name?.split(' ')[0] || 'User'}</span>
-            </div>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto overflow-x-hidden relative" id="main-scroll-container">

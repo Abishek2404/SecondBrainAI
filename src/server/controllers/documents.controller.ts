@@ -98,6 +98,48 @@ export const uploadDocument = async (req: Request, res: Response, next: NextFunc
         
         
         if (extractedText) {
+          if (document.subject === 'General') {
+             try {
+                 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                 let response;
+                 for (let attempt = 0; attempt < 3; attempt++) {
+                     try {
+                         response = await ai.models.generateContent({
+                             model: 'gemini-3.6-flash',
+                             contents: `Please determine the most appropriate subject or category, and suggest 3-5 tags for this document based on the following text. Respond ONLY with a valid JSON object in this format: {"subject": "string", "tags": ["tag1", "tag2"]}. Keep the subject to 1-3 words (e.g., "Mathematics", "Computer Science", "Web Development").\n\nText: ${extractedText ? extractedText.substring(0, 5000) : (document.extractedText ? document.extractedText.substring(0, 5000) : '')}`
+                         });
+                         break;
+                     } catch(aiError: any) {
+                         const errStr = String(aiError);
+                         if (attempt < 2 && (errStr.includes('429') || errStr.includes('quota'))) {
+                                console.warn("Quota limit reached, retrying in 60 seconds...");
+                                await new Promise(r => setTimeout(r, 61000));
+                            } else if (attempt < 2 && errStr.includes('503')) {
+                                console.warn("503 error, retrying in 5 seconds...");
+                                await new Promise(r => setTimeout(r, 5000));
+                            } else {
+                             throw aiError;
+                         }
+                     }
+                 }
+                 if (response && response.text) {
+                     try {
+                         const text = response.text.replace(/```json\n/g, '').replace(/```\n?/g, '').trim();
+                         const data = JSON.parse(text);
+                         if (data.subject && data.subject.length > 0 && data.subject.length < 50) {
+                             document.subject = data.subject;
+                         }
+                         if (Array.isArray(data.tags)) {
+                             document.tags = data.tags;
+                         }
+                     } catch (e) {
+                         console.error("Failed to parse subject/tags JSON", e);
+                     }
+                 }
+             } catch(err) {
+                 console.error("Error determining subject:", err);
+             }
+          }
           await processDocument(document._id.toString(), req.user?._id.toString(), extractedText);
         }
 
@@ -246,11 +288,28 @@ export const getDocumentInfo = async (req: Request, res: Response, next: NextFun
       // Generate summary if it doesn't exist and text is available
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Summarize the following document in a concise, informative paragraph:\n\n${document.extractedText.substring(0, 15000)}`,
-        });
-        summary = response.text || "Summary generation failed.";
+                 let response;
+                 for (let attempt = 0; attempt < 3; attempt++) {
+                     try {
+                         response = await ai.models.generateContent({
+                             model: 'gemini-3.6-flash',
+                             contents: `Summarize the following document in a concise, informative paragraph:\n\n${document.extractedText.substring(0, 15000)}`
+                         });
+                         break;
+                     } catch(aiError: any) {
+                         const errStr = String(aiError);
+                         if (attempt < 2 && (errStr.includes('429') || errStr.includes('quota'))) {
+                                console.warn("Quota limit reached, retrying in 60 seconds...");
+                                await new Promise(r => setTimeout(r, 61000));
+                            } else if (attempt < 2 && errStr.includes('503')) {
+                                console.warn("503 error, retrying in 5 seconds...");
+                                await new Promise(r => setTimeout(r, 5000));
+                            } else {
+                             throw aiError;
+                         }
+                     }
+                 }
+        summary = response ? (response.text || "Summary generation failed.") : "Summary generation failed.";
         document.summary = summary;
         await document.save();
       } catch (aiError) {

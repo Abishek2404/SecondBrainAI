@@ -394,17 +394,28 @@ export function Dashboard() {
                     else if (task.type === 'Reading') { Icon = BookOpen; color = "text-blue-600"; bg = "bg-blue-100 dark:bg-blue-900/30"; }
                     else if (task.type === 'Quiz') { Icon = Target; color = "text-orange-600"; bg = "bg-orange-100 dark:bg-orange-900/30"; }
                     else if (task.type === 'Notes') { Icon = FileText; color = "text-emerald-600"; bg = "bg-emerald-100 dark:bg-emerald-900/30"; }
+                    else if (task.type === 'Practice') { Icon = Target; color = "text-purple-600"; bg = "bg-purple-100 dark:bg-purple-900/30"; }
 
                     return (
                     <div key={i} className="flex flex-col p-4 rounded-[20px] bg-card border shadow-sm group hover:shadow-md transition-all gap-4 justify-between h-full cursor-pointer" onClick={() => navigate('/planner')}>
                        <div className="flex items-start justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
                              <div className={`h-10 w-10 shrink-0 rounded-[14px] ${bg} flex items-center justify-center`}>
-                                <Icon className={`h-5 w-5 ${color}`} />
+                                {task.type === 'Reading' ? (
+                                    <img src="/Reading.png" alt="Reading" className="w-10 h-10 object-contain" />
+                                ) : task.type === 'Practice' ? (
+                                    <img src="/Practise.png" alt="Practice" className="w-10 h-10 object-contain" />
+                                ) : (
+                                    <Icon className={`h-5 w-5 ${color}`} />
+                                )}
                              </div>
                              <div className="flex flex-col min-w-0">
                                 <h4 className="font-semibold text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">{task.title}</h4>
-                                <span className="text-[11px] text-muted-foreground mt-0.5">{task.type}</span>
+                                <span className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                                  {task.type === 'Reading' }
+                                  {task.type === 'Practice'}
+                                  {task.type}
+                                </span>
                              </div>
                           </div>
                        </div>
@@ -560,7 +571,11 @@ export function Dashboard() {
                               <span className={`text-sm font-medium truncate ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{task.title}</span>
                            </div>
                            <div className="flex items-center gap-3 shrink-0 ml-2">
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${bg} ${color}`}>{task.type}</span>
+                              <span className={`flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-md ${bg} ${color}`}>
+                                 {task.type === 'Reading' && <img src="/Reading.png" alt="Reading" className="w-3 h-3 object-contain" />}
+                                 {task.type === 'Practice' && <img src="/Practise.png" alt="Practice" className="w-3 h-3 object-contain" />}
+                                 {task.type}
+                              </span>
                               <span className="text-xs text-muted-foreground w-8 text-right">{task.duration || "30m"}</span>
                            </div>
                         </div>
