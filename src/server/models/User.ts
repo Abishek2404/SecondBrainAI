@@ -17,6 +17,8 @@ export interface IUser extends Document {
   subscriptionPlan?: string;
   resetPasswordToken?: string;
   resetPasswordExpire?: Date;
+  resetPasswordOtpAttempts?: number;
+  resetPasswordVerifiedToken?: string;
   createdAt?: Date;
   updatedAt?: Date;
   currentStreak: number;
@@ -93,6 +95,8 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    resetPasswordOtpAttempts: { type: Number, default: 0 },
+    resetPasswordVerifiedToken: String,
     currentStreak: {
       type: Number,
       default: 0,

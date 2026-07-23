@@ -338,10 +338,7 @@ export function SmartNotes() {
               </Select>
             </div>
             
-            <div className="flex items-center gap-1 border bg-card rounded-xl p-1 shadow-sm shrink-0">
-               <Button variant="ghost" size="icon" onClick={() => setViewMode("grid")} className={`h-9 w-9 rounded-lg ${viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}><LayoutGrid className="h-4 w-4" /></Button>
-               <Button variant="ghost" size="icon" onClick={() => setViewMode("list")} className={`h-9 w-9 rounded-lg ${viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}><List className="h-4 w-4" /></Button>
-            </div>
+            
           </div>
           
           <div className="flex flex-wrap items-center gap-2 mt-2 mb-4">

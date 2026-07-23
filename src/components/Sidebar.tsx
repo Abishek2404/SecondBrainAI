@@ -1,5 +1,6 @@
 import { FileText, MessageSquare, LayoutDashboard, Calendar, BarChart2, BookOpen, Search, Bell, Settings, LogOut, ChevronDown, User as UserIcon, Plus, Layers, BrainCircuit, Crown, Sparkles, ArrowRight } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { Logo } from "./Logo";
 import { cn } from "../lib/utils";
 import { useAuth } from "./AuthProvider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "./ui/dropdown-menu";
@@ -32,9 +33,8 @@ export function Sidebar({ className, isMobile, onNavigate }: SidebarProps) {
     <div className={cn("flex h-full flex-col border-r border-border/40 bg-background transition-all duration-300", !isMobile && "md:w-20 lg:w-72", isMobile && "w-72", className)}>
       <div className={cn("flex h-20 items-center px-6 pt-2", !isMobile && "justify-center lg:justify-start", isMobile && "pr-12")}>
         <div className="flex items-center gap-3">
-          {/* Custom Logo from image */}
           <div className="flex items-center gap-2">
-            <span className="font-black text-2xl tracking-tighter">S<span className="text-sm align-super">3</span></span>
+            <Logo className="w-8 h-8" />
           </div>
           <span className={cn("font-bold text-[1.1rem] tracking-tight", !isMobile && "hidden lg:block")}>SecondBrain AI</span>
         </div>

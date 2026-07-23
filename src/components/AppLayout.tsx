@@ -1,3 +1,4 @@
+import { Logo } from "./Logo";
 import { Outlet, useNavigate, useLocation, useOutlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Search, Menu, Gift, WifiOff } from "lucide-react";
@@ -92,7 +93,8 @@ export function AppLayout() {
               </div>
             </div>
 
-            <div className="font-semibold text-lg tracking-tight md:hidden">
+            <div className="flex items-center gap-2 md:hidden font-semibold text-lg tracking-tight">
+              <Logo className="w-6 h-6" />
               SecondBrain AI
             </div>
           </div>

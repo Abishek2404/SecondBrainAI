@@ -209,66 +209,65 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       return next(new AppError('Please provide an email', 400));
     }
     
-    // Always return a generic message to prevent email enumeration
-    const genericMessage = 'If an account exists for this email, a password reset link has been sent.';
-
+    const genericMessage = 'If an account exists for this email, a password reset OTP has been sent.';
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(200).json({ success: true, message: genericMessage });
     }
 
-    // Generate token
-    const resetToken = crypto.randomBytes(20).toString('hex');
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Hash token and set to resetPasswordToken field
+    // Hash OTP and set to resetPasswordToken field
     const resetPasswordToken = crypto
       .createHash('sha256')
-      .update(resetToken)
+      .update(otp)
       .digest('hex');
 
-    // Set expire (15 minutes)
-    const resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000);
+    // Set expire (5 minutes)
+    const resetPasswordExpire = new Date(Date.now() + 5 * 60 * 1000);
 
     // Save user with token
     user.resetPasswordToken = resetPasswordToken;
     user.resetPasswordExpire = resetPasswordExpire;
+    user.resetPasswordOtpAttempts = 0;
+    user.resetPasswordVerifiedToken = undefined;
     await user.save({ validateBeforeSave: false });
 
-    // Create reset url
-    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
-
-    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a put request to: \n\n ${resetUrl} \n\n If you didn't request this, please ignore this email.`;
+    const message = `Your password reset OTP is: ${otp}\n\nThis OTP is valid for 5 minutes.`;
     
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>Password Reset Request</h2>
         <p>Hello ${user.name || 'User'},</p>
         <p>You requested a password reset for your SecondBrain AI account.</p>
-        <p>Please click the button below to reset your password. This link is valid for 15 minutes.</p>
+        <p>Your OTP for resetting the password is:</p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetUrl}" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; background-color: #f1f5f9; padding: 12px 24px; border-radius: 8px;">${otp}</span>
         </div>
-        <p>Or copy and paste this link into your browser:</p>
-        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>This OTP is valid for 5 minutes.</p>
         <p style="color: #64748b; font-size: 14px; margin-top: 30px;">If you didn't request a password reset, you can safely ignore this email.</p>
       </div>
     `;
 
     try {
-      await sendEmail({
+      const emailResult = await sendEmail({
         email: user.email,
-        subject: 'SecondBrain AI - Password Reset Token',
+        subject: 'SecondBrain AI - Password Reset OTP',
         message,
         html
       });
-
-      res.status(200).json({ success: true, message: genericMessage });
+      if (emailResult && emailResult.mocked) {
+        res.status(200).json({ success: true, message: genericMessage, mockOtp: otp });
+      } else {
+        res.status(200).json({ success: true, message: genericMessage });
+      }
     } catch (err) {
       console.log(err);
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
+      user.resetPasswordOtpAttempts = undefined;
       await user.save({ validateBeforeSave: false });
-
       return next(new AppError('Email could not be sent', 500));
     }
   } catch (error) {
@@ -276,43 +275,108 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return next(new AppError('Please provide email and OTP', 400));
+    }
+
+    const user = await User.findOne({ 
+      email,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user || !user.resetPasswordToken) {
+      return next(new AppError('Invalid or expired OTP', 400));
+    }
+
+    const attempts = user.resetPasswordOtpAttempts || 0;
+    if (attempts >= 5) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Too many failed attempts. Please request a new OTP.', 400));
+    }
+
+    let cleanOtp = String(otp).trim();
+    const digitMatch = cleanOtp.match(/^\d{6}$/);
+    if (!digitMatch) {
+        // If they accidentally sent the whole sentence, try to extract 6 digits
+        const extracted = cleanOtp.match(/\d{6}/);
+        if (extracted) cleanOtp = extracted[0];
+    }
+    const hashedOtp = crypto
+      .createHash('sha256')
+      .update(cleanOtp)
+      .digest('hex');
+
+    if (hashedOtp !== user.resetPasswordToken && cleanOtp !== user.resetPasswordToken) {
+      user.resetPasswordOtpAttempts = attempts + 1;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Invalid OTP', 400));
+    }
+
+    // OTP verified successfully. Generate a verified token.
+    const verifiedToken = crypto.randomBytes(20).toString('hex');
+    user.resetPasswordVerifiedToken = crypto.createHash('sha256').update(verifiedToken).digest('hex');
+    user.resetPasswordToken = undefined; // clear otp
+    user.resetPasswordOtpAttempts = undefined;
+    // extend expiration for the reset flow
+    user.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000); 
+    
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully',
+      verifiedToken
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Get hashed token
-    const resetPasswordToken = crypto
+    const { email, token, password } = req.body;
+
+    if (!email || !token || !password) {
+       return next(new AppError('Please provide email, token, and new password', 400));
+    }
+
+    const cleanToken = String(token).trim();
+    const hashedToken = crypto
       .createHash('sha256')
-      .update(req.params.token)
+      .update(cleanToken)
       .digest('hex');
 
     const user = await User.findOne({
-      resetPasswordToken,
+      email,
       resetPasswordExpire: { $gt: Date.now() },
+      $or: [
+        { resetPasswordVerifiedToken: hashedToken },
+        { resetPasswordVerifiedToken: cleanToken }
+      ]
     });
 
     if (!user) {
       return next(new AppError('Invalid or expired token', 400));
     }
 
-    // Set new password
-    const newPassword = req.body.password;
-    if (!newPassword) {
-       return next(new AppError('Please provide a new password', 400));
+    if (password.length < 6) {
+      return next(new AppError('Password must contain at least 6 characters.', 400));
     }
     
-    if (newPassword.length < 8 || 
-        !/[A-Z]/.test(newPassword) || 
-        !/[a-z]/.test(newPassword) || 
-        !/[0-9]/.test(newPassword) || 
-        !/[^A-Za-z0-9]/.test(newPassword)) {
-      return next(new AppError('Password does not meet strength requirements', 400));
-    }
-    
-    user.password = newPassword;
+    user.password = password;
     user.passwordUpdatedAt = new Date();
-    user.resetPasswordToken = undefined;
+    user.resetPasswordVerifiedToken = undefined;
     user.resetPasswordExpire = undefined;
+    
     await user.save();
-
+    
     res.status(200).json({
       success: true,
       message: 'Password updated successfully'
@@ -323,28 +387,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 };
 
 export const verifyResetToken = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
-
-    const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return next(new AppError('Invalid or expired token', 400));
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Token is valid'
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(200).json({ success: true }); // legacy mock
 };
 
 export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {

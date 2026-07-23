@@ -14,7 +14,7 @@ const sendEmail = async (options: SendEmailOptions) => {
     console.log(`Subject: ${options.subject}`);
     console.log(`Message: ${options.message}`);
     console.log('------------------');
-    return;
+    return { mocked: true };
   }
 
   // Create a transporter
@@ -40,6 +40,7 @@ const sendEmail = async (options: SendEmailOptions) => {
     // Send the email
     const info = await transporter.sendMail(message);
     console.log('Message sent: %s', info.messageId);
+    return { mocked: false };
   } catch (error) {
     // console.error('Email sending failed, falling back to mock:', error);
     console.log('--- MOCK EMAIL ---');
@@ -47,6 +48,7 @@ const sendEmail = async (options: SendEmailOptions) => {
     console.log(`Subject: ${options.subject}`);
     console.log(`Message: ${options.message}`);
     console.log('------------------');
+    return { mocked: true };
   }
 };
 
