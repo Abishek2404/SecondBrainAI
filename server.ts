@@ -17,7 +17,11 @@ dotenv.config({ override: true });
 
 async function startServer() {
   // Connect to MongoDB
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (error) {
+    console.error("Warning: Failed to connect to MongoDB. API routes requiring database will fail.");
+  }
 
   const app = express();
   const PORT = 3000;

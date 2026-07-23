@@ -123,6 +123,10 @@ app.use(errorHandler);
 
 // We define a wrapper that ensures the DB is connected before handling the request
 export default async function handler(req: any, res: any) {
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (error) {
+    console.error("Vercel DB Connection Error:", error);
+  }
   return app(req, res);
 }
