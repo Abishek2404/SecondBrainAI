@@ -28,7 +28,7 @@ app.use("/api", apiRoutes);
 app.get("/uploads/:filename", async (req: any, res: any, next: any) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(process.cwd(), "uploads", filename);
+    const filePath = process.env.VERCEL ? path.join("/tmp/uploads", filename) : path.join(process.cwd(), "uploads", filename);
     
     // If it's an avatar, allow public access
     if (filename.startsWith('avatar-')) {
